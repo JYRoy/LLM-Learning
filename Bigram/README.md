@@ -1,6 +1,9 @@
 # Bigram
 
-[TOC]
+- [Bigram](#bigram)
+  - [What is bigram model?](#what-is-bigram-model)
+  - [Concepts](#concepts)
+  - [Resources](#resources)
 
 ## What is bigram model?
 

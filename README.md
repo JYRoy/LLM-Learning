@@ -4,7 +4,14 @@ Learning how to build and fine-tune some large language models from scratch inps
 
 ## Catalog
 
-[TOC]
+- [LLM-Learning](#llm-learning)
+  - [Catalog](#catalog)
+  - [Supported](#supported)
+  - [Awesome LLM](#awesome-llm)
+    - [Model](#model)
+    - [Fine-tuning](#fine-tuning)
+  - [Environments](#environments)
+
 
 ## Supported
 
