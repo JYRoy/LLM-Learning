@@ -44,9 +44,9 @@ for example:
    - The output logits are passed through a softmax layer to obtain probability distributions over the vocabulary
    - model receives 256(32, 8) tokens as targets
    - targets(32, 8) and logits (32, 8, 64) will be used to compute [cross_entropy_loss](https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html#torch.nn.functional.cross_entropy) which input shape is (N, C) and target shape is (N)
-    - N: batch size
-    - C: number of classes
+      - N: batch size
+      - C: number of classes
 
 ## Resources
 
-- [Standord Course: N-gram](extension://oikmahiipjniocckomdccmplodldodja/pdf-viewer/web/viewer.html?file=https%3A%2F%2Fweb.stanford.edu%2F~jurafsky%2Fslp3%2F3.pdf)
+- [Standord Course: N-gram](https://web.stanford.edu/~jurafsky/slp3/3.pdf)
