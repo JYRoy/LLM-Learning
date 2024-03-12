@@ -3,9 +3,10 @@
 - [Transformer](#transformer)
   - [Architecture](#architecture)
   - [Input](#input)
-  - [Output](#output)
   - [Encoder](#encoder)
+    - [Multi-head Attention](#multi-head-attention)
   - [Decoder](#decoder)
+  - [Output](#output)
   - [Resources](#resources)
 
 
@@ -26,11 +27,20 @@ Token Embedding + Segment Embedding + Position Embedding
   - this way ensures different value for each token
   - 10000 ** (2 * i / d_model): 2i ranges (0, d_model, 2step), means the frequency downs from 1 to 1/10000
 
-## Output
-
 ## Encoder
 
+![Encoder.PNG](.images/Encoder.PNG)
+
+- N encoders
+- tow sub-layers in each encoder
+- first sub-layer consists of a multi-head attention sub-layer and normalization layer with a residual connection
+- second sub-layer consists of a feed forward layer and normalization layer with a residual connection
+
+### Multi-head Attention
+
 ## Decoder
+
+## Output
 
 ## Resources
 
