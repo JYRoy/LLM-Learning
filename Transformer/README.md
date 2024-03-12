@@ -22,10 +22,13 @@ Token Embedding + Segment Embedding + Position Embedding
 - Position Encoding: sin/cos position encoding
   - ![sin_cos_formula.PNG](.images/sin_cos_formula.PNG)
     - pos: absolute position index
-    - 2i: odd position in embedding
-    - 2i+1: even position in embedding
-  - this way ensures different value for each token
+    - i: from 0 to embedding length, like (0, 512) if we want 512 embedding length for the token
+    - 2i: odd position in embedding, this value is calculated from sin
+    - 2i+1: even position in embedding, this value is calculated from cos
+  - this way ensures different value for each token between 1 and -1
   - 10000 ** (2 * i / d_model): 2i ranges (0, d_model, 2step), means the frequency downs from 1 to 1/10000
+  - ![position_encoding.jpg](.images/position_encoding.jpg)
+    - This figure is an real example of position encoding for 60 words(rows) with an embedding size of 512(columns). The sin and cos signals are interweaving.
 
 ## Encoder
 
