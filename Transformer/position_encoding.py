@@ -52,18 +52,18 @@ class PositionEncoding(nn.Module):
         return self.dropout(x)
 
 
-vocab = 1000
-d_model = 512
-dropout = 0.1
-max_len = 60
+# vocab = 1000
+# d_model = 512
+# dropout = 0.1
+# max_len = 60
 
-x = Variable(torch.LongTensor([[1, 2, 3, 4], [4, 5, 6, 7]]))
-emb = Embeddings(vocab=vocab, d_model=d_model)
-embr = emb(x)
-x = embr
+# x = Variable(torch.LongTensor([[1, 2, 3, 4], [4, 5, 6, 7]]))
+# emb = Embeddings(vocab=vocab, d_model=d_model)
+# embr = emb(x)
+# x = embr
 
-pe = PositionEncoding(d_model, dropout, max_len)
-pe_result = pe(x)
+# pe = PositionEncoding(d_model, dropout, max_len)
+# pe_result = pe(x)
 
-print(pe_result)
-print(pe_result.shape)
+# print(pe_result)
+# print(pe_result.shape)

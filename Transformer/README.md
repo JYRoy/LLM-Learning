@@ -4,6 +4,7 @@
   - [Architecture](#architecture)
   - [Input](#input)
   - [Encoder](#encoder)
+    - [Self-Attention](#self-attention)
     - [Multi-head Attention](#multi-head-attention)
   - [Decoder](#decoder)
   - [Output](#output)
@@ -38,6 +39,12 @@ Token Embedding + Segment Embedding + Position Embedding
 - tow sub-layers in each encoder
 - first sub-layer consists of a multi-head attention sub-layer and normalization layer with a residual connection
 - second sub-layer consists of a feed forward layer and normalization layer with a residual connection
+
+### Self-Attention
+
+$$
+Attention(Q, K, V) = softmax(\frac{QK^T}{\sqrt{d_k}}) V
+$$
 
 ### Multi-head Attention
 

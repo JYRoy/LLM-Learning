@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 import torch
+import torch.nn.functional as F
 
 
 def subsequent_mask(size):
@@ -19,17 +21,27 @@ def subsequent_mask(size):
     return torch.from_numpy(1 - subsequent_mask)
 
 
-# size = 5
-# sm = subsequent_mask(size)
-# print("sm: ", sm)
-# plt.figure(figsize = (5, 5))
-# plt.imshow(subsequent_mask(20)[0])
-# plt.savefig('.images/subsequent_mask.jpg',bbox_inches='tight')
-"""
-output: 
-sm:  tensor([[[1, 0, 0, 0, 0],
-              [1, 1, 0, 0, 0],
-              [1, 1, 1, 0, 0],
-              [1, 1, 1, 1, 0],
-              [1, 1, 1, 1, 1]]], dtype=torch.uint8)
-"""
+def attention(query, key, value, mask=None, dropout=None):
+    """
+    query, key, value: attention tensor
+    mask: mask tensor
+    dropout: Dropout instance
+    """
+    d_k = query.size(-1)  # get token embedding size
+
+    # calculate scores
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    # mask fill
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, 1e-9)
+
+    # softmax on scores
+    p_atten = F.softmax(scores, dim=-1)
+
+    if dropout is not None:
+        p_atten = dropout(p_atten)
+
+    # calculate attention value
+    attn_val = torch.matmul(p_atten, value)
+    return attn_val, p_atten
