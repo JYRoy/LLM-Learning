@@ -5,6 +5,8 @@
   - [Input](#input)
   - [Encoder](#encoder)
     - [Self-Attention](#self-attention)
+      - [Formula](#formula)
+      - [Matrix Calculation of Self-Attention](#matrix-calculation-of-self-attention)
     - [Multi-head Attention](#multi-head-attention)
   - [Decoder](#decoder)
   - [Output](#output)
@@ -42,9 +44,26 @@ Token Embedding + Segment Embedding + Position Embedding
 
 ### Self-Attention
 
+#### Formula
 $$
 Attention(Q, K, V) = softmax(\frac{QK^T}{\sqrt{d_k}}) V
 $$
+
+Q, K, V means Query vector, Key vector and Value Vector. These vectors are created by multiplying the embedding by three matrices $W^Q$, $W^K$, $W^V$ that we trained during the training process. The dimension of Q, K, V is smaller than embedding vector, for example, the embedding dim is 512 and we want the vector dimension is 64 so that the dimension of matrices is (512, 64).
+
+$d_k$ is the Q, K, V dimension, 64. The reason for dividing the score by $\sqrt{d_k}$ is leading to having more stable gradients.
+
+![self attention.PNG](.images/self%20attention.PNG)
+
+#### Matrix Calculation of Self-Attention
+
+The calculation is done in matrix form for faster processing.
+
+![Matrix calculation.PNG](.images/Matrix%20calculation.PNG)
+
+Each row in X means a word in input sequence. X's shape is (num words, 512), W's shape is (512, 64) so the Q, K, V's shape is (num words, 64).
+
+![matix calculation of self attention.PNG](.images/matix%20calculation%20of%20self%20attention.PNG)
 
 ### Multi-head Attention
 
