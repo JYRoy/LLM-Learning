@@ -16,6 +16,7 @@ vocab = 1000
 d_model = 512
 dropout = 0.1
 max_len = 60
+head = 8
 
 x = Variable(torch.LongTensor([[1, 2, 3, 4], [4, 5, 6, 7]]))
 emb = Embeddings(vocab=vocab, d_model=d_model)
@@ -48,3 +49,8 @@ print(attn)
 print(attn.shape)
 print(p_attn)
 print(p_attn.shape)
+
+mha = MultiHeadedAttention(head, d_model, dropout)
+mha_res = mha(query, key, value, mask)
+print(mha_res)
+print(mha_res.shape)

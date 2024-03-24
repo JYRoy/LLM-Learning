@@ -67,6 +67,14 @@ Each row in X means a word in input sequence. X's shape is (num words, 512), W's
 
 ### Multi-head Attention
 
+Multi-headed attention aims to get different features and get different representation.
+
+![multi-headed attention.PNG](.images/multi-headed%20attention.PNG)
+
+The multi-headed attention calculation process. It omits embedding dimension, only has batchsize and sequense length dimension for input so that X is tow dimension tensor. In the picture, X shape is (2, 4) but actually it is (2, 4, 512).
+
+![multi-headed attention calculation.PNG](.images/multi-headed%20attention%20calculation.PNG)
+
 ## Decoder
 
 ## Output
