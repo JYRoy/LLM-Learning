@@ -10,6 +10,7 @@ from torch.autograd import Variable
 from embedding import *
 from encoder import *
 from position_encoding import *
+from feed_forward import *
 
 
 vocab = 1000
@@ -54,3 +55,10 @@ mha = MultiHeadedAttention(head, d_model, dropout)
 mha_res = mha(query, key, value, mask)
 print(mha_res)
 print(mha_res.shape)
+
+x = mha_res
+d_ff = 64
+ff = PosotionwiseFeedForward(d_model, d_ff, dropout)
+ff_result = ff(x)
+print(ff_result)
+print(ff_result.shape)
