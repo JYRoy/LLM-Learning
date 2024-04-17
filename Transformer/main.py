@@ -85,3 +85,11 @@ sc_result = sc(x, sublayer)
 print(sc_result)
 print(sc_result.shape)
 
+c = copy.deepcopy
+layer = EncoderLayer(size, self_attn, ff, dropout)
+N = 8
+
+en = Encoder(layer, N)
+en_res = en(x, mask)
+print(en_res)
+print(en_res.shape)
