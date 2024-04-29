@@ -8,11 +8,13 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from attention import *
+from decoder import *
 from embedding import *
 from encoder import *
 from position_encoding import *
 from feed_forward import *
 from norm import *
+from output import *
 from sublayer_connection import *
 
 vocab = 1000
@@ -93,3 +95,24 @@ en = Encoder(layer, N)
 en_res = en(x, mask)
 print(en_res)
 print(en_res.shape)
+
+
+self_attn = src_attn = MultiHeadedAttention(head, d_model, dropout)
+ff = PosotionwiseFeedForward(d_model, d_ff, dropout)
+
+x = pe_result
+memory = en_res
+mask = Variable(torch.zeros(2, 4, 4))
+source_mask = target_mask = mask
+
+dl = DecoderLayer(size, self_attn, src_attn, ff, dropout)
+
+de = Decoder(dl, N)
+de_res = de(x, memory, source_mask, target_mask)
+print(de_res)
+print(de_res.shape)
+
+gen = Generator(d_model, vocab)
+gen_result = gen(x)
+print(gen_result)
+print(gen_result.shape)
