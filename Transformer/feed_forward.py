@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class PosotionwiseFeedForward(nn.Module):
+class PositionwiseFeedForward(nn.Module):
     def __init__(self, d_model, d_ff, dropout=0.1):
         """
         d_model: word embedding dimension,
@@ -12,7 +12,7 @@ class PosotionwiseFeedForward(nn.Module):
         d_ff: middle dimensional between two linears
         dropout: dropout ratio
         """
-        super(PosotionwiseFeedForward, self).__init__()
+        super(PositionwiseFeedForward, self).__init__()
 
         self.w1 = nn.Linear(d_model, d_ff)
         self.w2 = nn.Linear(d_ff, d_model)

@@ -11,6 +11,7 @@ from attention import *
 from decoder import *
 from embedding import *
 from encoder import *
+from model import *
 from position_encoding import *
 from feed_forward import *
 from norm import *
@@ -62,7 +63,7 @@ print(mha_res.shape)
 
 x = mha_res
 d_ff = 64
-ff = PosotionwiseFeedForward(d_model, d_ff, dropout)
+ff = PositionwiseFeedForward(d_model, d_ff, dropout)
 ff_result = ff(x)
 print(ff_result)
 print(ff_result.shape)
@@ -98,7 +99,7 @@ print(en_res.shape)
 
 
 self_attn = src_attn = MultiHeadedAttention(head, d_model, dropout)
-ff = PosotionwiseFeedForward(d_model, d_ff, dropout)
+ff = PositionwiseFeedForward(d_model, d_ff, dropout)
 
 x = pe_result
 memory = en_res
@@ -116,3 +117,19 @@ gen = Generator(d_model, vocab)
 gen_result = gen(x)
 print(gen_result)
 print(gen_result.shape)
+
+vocab_size = 1000
+d_model = 512
+encoder = en
+decoder = de
+source_embed = nn.Embedding(vocab_size, d_model)
+target_embed = nn.Embedding(vocab_size, d_model)
+generator = gen
+
+source = target = Variable(torch.LongTensor([[100, 2, 421, 508], [491, 998, 1, 221]]))
+source_mask = target_mask = Variable(torch.zeros(2, 4, 4))
+
+ed = EncoderDecoder(encoder, decoder, source_embed, target_embed, generator)
+ed_result = ed(source, target, source_mask, target_mask)
+print(ed_result)
+print(ed_result.shape)

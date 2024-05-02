@@ -32,7 +32,7 @@ class Encoder(nn.Module):
         N: numbers of encoder layer
         """
         super(Encoder, self).__init__()
-        self.layers = [layer for _ in range(N)]
+        self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)  # used after Nth layers
 
     def forward(self, x, mask):

@@ -48,7 +48,7 @@ class Decoder(nn.Module):
         N: numbers of Decoder layer
         """
         super(Decoder, self).__init__()
-        self.layers = [layer for _ in range(N)]
+        self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)  # used after Nth layers
 
     def forward(self, x, memory, source_mask, target_mask):
