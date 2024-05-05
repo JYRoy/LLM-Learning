@@ -15,9 +15,6 @@ from norm import *
 from output import *
 from sublayer_connection import *
 
-source_vocab = 11
-target_vocab = 11
-N = 6
 
 class EncoderDecoder(nn.Module):
     def __init__(self, encoder, decoder, source_embed, target_embed, generator):
@@ -64,8 +61,12 @@ def make_model(
     model = EncoderDecoder(
         Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
         Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
-        nn.Sequential(Embeddings(d_model, source_vocab), c(position)),
-        nn.Sequential(Embeddings(d_model, target_vocab), c(position)),
+        nn.Sequential(
+            Embeddings(vocab_size=source_vocab, emb_size=d_model), c(position)
+        ),
+        nn.Sequential(
+            Embeddings(vocab_size=target_vocab, emb_size=d_model), c(position)
+        ),
         Generator(d_model, target_vocab),
     )
 
@@ -74,7 +75,3 @@ def make_model(
             nn.init.xavier_uniform(p)
 
     return model
-
-if __name__=='__main__':
-    model = make_model(source_vocab, target_vocab, N)
-    print(model)

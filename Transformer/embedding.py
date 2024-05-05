@@ -5,17 +5,13 @@ import torch.nn as nn
 
 
 class Embeddings(nn.Module):
-    def __init__(self, vocab, d_model):
-        """
-        vocab: the number of tokens
-        d_model: the dimension of word embedding
-        """
+    def __init__(self, vocab_size, emb_size):
         super(Embeddings, self).__init__()
-        self.lut = nn.Embedding(vocab, d_model)
-        self.d_model = d_model
+        self.embedding = nn.Embedding(vocab_size, emb_size)
+        self.emb_size = emb_size
 
-    def forward(self, x):
-        return self.lut(x) * math.sqrt(self.d_model)
+    def forward(self, tokens):
+        return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
 
 
 # vocab = 1000

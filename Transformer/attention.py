@@ -6,6 +6,29 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from data_generator import *
+
+
+def generate_square_subsequent_mask(sz):
+    mask = (torch.triu(torch.ones((sz, sz), device="cuda")) == 1).transpose(0, 1)
+    mask = (
+        mask.float()
+        .masked_fill(mask == 0, float("-inf"))
+        .masked_fill(mask == 1, float(0.0))
+    )
+    return mask
+
+
+def create_mask(src, tgt):
+    src_seq_len = src.shape[0]
+    tgt_seq_len = tgt.shape[0]
+
+    tgt_mask = generate_square_subsequent_mask(tgt_seq_len)
+    src_mask = torch.zeros((src_seq_len, src_seq_len), device="cuda").type(torch.bool)
+    src_padding_mask = (src == PAD_IDX).transpose(0, 1)
+    tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
+    return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
+
 
 def subsequent_mask(size):
     """mask subsequent tensor
@@ -39,7 +62,7 @@ def attention(query, key, value, mask=None, dropout=None):
         scores = scores.masked_fill(mask == 0, 1e-9)
 
     # softmax on scores
-    p_atten = F.softmax(scores, dim=-1)
+    p_atten = torch.softmax(scores, dim=-1)
 
     if dropout is not None:
         p_atten = dropout(p_atten)
@@ -74,7 +97,7 @@ class MultiHeadedAttention(nn.Module):
 
         self.head = head
         self.embedding_dim = embedding_dim
-        
+
         # multi-headed attention uses four linears
         self.linears = clones(nn.Linear(embedding_dim, embedding_dim), 4)
 
@@ -85,15 +108,17 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None):
         if mask is not None:
-            mask = mask.unsqueeze(1)  # expand the first dimension
+            mask = mask.unsqueeze(0)  # expand the first dimension
 
-        batch_size = query.size(0)  # get batch size
+        batch_size = query.size(1)  # get batch size
 
         # linear transform for V, K, Q
         # linear dimension equals to embedding_dim(512), but it splitted into 8 heads
         # it means that project them to a smaller space(self.d_k = 64)
         query, key, value = [
-            model(x).view(batch_size, -1, self.head, self.d_k).transpose(1, 2)  # [batch_size, head(8), seq_len, 64]
+            model(x)
+            .view(batch_size, -1, self.head, self.d_k)
+            .transpose(1, 2)  # [batch_size, head(8), seq_len, 64]
             for model, x in zip(self.linears, (query, key, value))
         ]
 
@@ -101,7 +126,9 @@ class MultiHeadedAttention(nn.Module):
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
 
         # re-transpose 1, 2 dimension
-        x = x.transpose(1, 2).contiguous().view(batch_size, -1, self.head * self.d_k)  # [batchsize, seq_len, 512]
+        x = (
+            x.transpose(1, 2).contiguous().view(-1, batch_size, self.head * self.d_k)
+        )  # [seq_len, batchsize, 512]
 
         # last linear transpose
         return self.linears[-1](x)  # [batchsize, seq_len, 512]

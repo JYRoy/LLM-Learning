@@ -38,7 +38,7 @@ class PositionEncoding(nn.Module):
         # plt.savefig('.images/position_encoding.jpg',bbox_inches='tight')
         # plt.show()
 
-        pe = pe.unsqueeze(0)
+        pe = pe.unsqueeze(-2)
 
         # position is not the trainable parameter
         self.register_buffer("pe", pe)
@@ -48,7 +48,7 @@ class PositionEncoding(nn.Module):
         x: token embedding from embedding module
         """
         # resize max_len dimension to x length
-        x = x + Variable(self.pe[:, : x.size(1)], requires_grad=False)
+        x = x + Variable(self.pe[: x.size(0), :], requires_grad=False)
         return self.dropout(x)
 
 
