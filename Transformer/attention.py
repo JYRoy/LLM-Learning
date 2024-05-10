@@ -10,7 +10,7 @@ from data_generator import *
 
 
 def generate_square_subsequent_mask(sz):
-    mask = (torch.triu(torch.ones((sz, sz), device="cuda")) == 1).transpose(0, 1)
+    mask = (torch.triu(torch.ones((1, sz, sz), device="cuda")) == 1).transpose(1, 2)
     mask = (
         mask.float()
         .masked_fill(mask == 0, float("-inf"))
@@ -19,31 +19,15 @@ def generate_square_subsequent_mask(sz):
     return mask
 
 
-def create_mask(src, tgt):
-    src_seq_len = src.shape[0]
-    tgt_seq_len = tgt.shape[0]
+def create_mask(src, tgt):  # (batch_size, seq_len)
+    src_seq_len = src.shape[1]
+    tgt_seq_len = tgt.shape[1]
 
     tgt_mask = generate_square_subsequent_mask(tgt_seq_len)
-    src_mask = torch.zeros((src_seq_len, src_seq_len), device="cuda").type(torch.bool)
-    src_padding_mask = (src == PAD_IDX).transpose(0, 1)
-    tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
+    src_mask = torch.zeros((1, src_seq_len, src_seq_len), device="cuda").type(torch.bool)
+    src_padding_mask = (src == PAD_IDX).unsqueeze(-2)
+    tgt_padding_mask = (tgt == PAD_IDX).unsqueeze(-2)
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
-
-
-def subsequent_mask(size):
-    """mask subsequent tensor
-
-    size: the size of last two dimensions of the tensor
-    """
-    attn_shape = (1, size, size)
-    # upper triangular matrix
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
-    # lower triangular matrix
-    # 1 means masked, 0 means unmasked
-    # row means the current position
-    # col means the related postions with current position
-    # for example: the index 2(3 position) could see 2 tokens
-    return torch.from_numpy(1 - subsequent_mask)
 
 
 def attention(query, key, value, mask=None, dropout=None):
@@ -108,9 +92,9 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None):
         if mask is not None:
-            mask = mask.unsqueeze(0)  # expand the first dimension
+            mask = mask.unsqueeze(1)  # expand the first dimension
 
-        batch_size = query.size(1)  # get batch size
+        batch_size = query.size(0)  # get batch size
 
         # linear transform for V, K, Q
         # linear dimension equals to embedding_dim(512), but it splitted into 8 heads
@@ -127,7 +111,7 @@ class MultiHeadedAttention(nn.Module):
 
         # re-transpose 1, 2 dimension
         x = (
-            x.transpose(1, 2).contiguous().view(-1, batch_size, self.head * self.d_k)
+            x.transpose(1, 2).contiguous().view(batch_size, -1, self.head * self.d_k)
         )  # [seq_len, batchsize, 512]
 
         # last linear transpose

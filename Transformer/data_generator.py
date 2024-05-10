@@ -1,32 +1,39 @@
-from pyitcast.transformer_utils import Batch
-import codecs
-import random
-import regex
-import torch
-import torch.functional as F
-import torch.nn as nn
-from torch.autograd import Variable
-import torchtext
-from torchtext.data import get_tokenizer
-import numpy as np
+import os
 
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from torchtext.datasets import multi30k, Multi30k
-from typing import Iterable, List
+from torchtext.data.functional import to_map_style_dataset
+from torchtext.vocab import build_vocab_from_iterator
+
+import spacy
+import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 # We need to modify the URLs for the dataset since the links to the original dataset are broken
 # Refer to https://github.com/pytorch/text/issues/1756#issuecomment-1163664163 for more info
+# Update URLs to point to data stored by user
 multi30k.URL["train"] = (
     "https://raw.githubusercontent.com/neychev/small_DL_repo/master/datasets/Multi30k/training.tar.gz"
 )
 multi30k.URL["valid"] = (
     "https://raw.githubusercontent.com/neychev/small_DL_repo/master/datasets/Multi30k/validation.tar.gz"
 )
+multi30k.URL["test"] = (
+    "https://raw.githubusercontent.com/neychev/small_DL_repo/master/datasets/Multi30k/mmt_task1_test2016.tar.gz"
+)
+
+# Update hash since there is a discrepancy between user hosted test split and that of the test split in the original dataset
+multi30k.MD5["test"] = (
+    "876a95a689a2a20b243666951149fd42d9bfd57cbbf8cd2c79d3465451564dd2"
+)
 
 SRC_LANGUAGE = "de"
 TGT_LANGUAGE = "en"
+MAX_LEN = 72
 
 # Place-holders
 token_transform = {}
@@ -44,76 +51,234 @@ def fake_data_generator(V, batch_size, num_batch):
         yield Batch(source, target)
 
 
-token_transform[SRC_LANGUAGE] = get_tokenizer("spacy", language="de_core_news_sm")
-token_transform[TGT_LANGUAGE] = get_tokenizer("spacy", language="en_core_web_sm")
+def subsequent_mask(size):
+    """mask subsequent tensor
+
+    size: the size of last two dimensions of the tensor
+    """
+    attn_shape = (1, size, size)
+    # upper triangular matrix
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
+    # lower triangular matrix
+    # 1 means masked, 0 means unmasked
+    # row means the current position
+    # col means the related postions with current position
+    # for example: the index 2(3 position) could see 2 tokens
+    return torch.from_numpy(1 - subsequent_mask)
 
 
-# helper function to yield list of tokens
-def yield_tokens(data_iter: Iterable, language: str) -> List[str]:
-    language_index = {SRC_LANGUAGE: 0, TGT_LANGUAGE: 1}
+class Batch:
+    """Object for holding a batch of data with mask during training."""
 
-    for data_sample in data_iter:
-        yield token_transform[language](data_sample[language_index[language]])
+    def __init__(self, src, tgt=None, pad=2):  # 2 = <blank>
+        self.src = src
+        self.src_mask = (src != pad).unsqueeze(-2)
+        if tgt is not None:
+            self.tgt = tgt[:, :-1]
+            self.tgt_y = tgt[:, 1:]
+            self.tgt_mask = self.make_std_mask(self.tgt, pad)
+            self.ntokens = (self.tgt_y != pad).data.sum()
+
+    @staticmethod
+    def make_std_mask(tgt, pad):
+        "Create a mask to hide padding and future words."
+        tgt_mask = (tgt != pad).unsqueeze(-2)
+        tgt_mask = tgt_mask & subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
+        return tgt_mask
 
 
-# Define special symbols and indices
-UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
-# Make sure the tokens are in order of their indices to properly insert them in vocab
-special_symbols = ["<unk>", "<pad>", "<bos>", "<eos>"]
+def load_tokenizers():
+    try:
+        spacy_de = spacy.load("de_core_news_sm")
+    except IOError:
+        os.system("python -m spacy download de_core_news_sm")
+        spacy_de = spacy.load("de_core_news_sm")
 
-for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
-    # Training data Iterator
-    train_iter = Multi30k(split="train", language_pair=(SRC_LANGUAGE, TGT_LANGUAGE))
-    # Create torchtext's Vocab object
-    vocab_transform[ln] = build_vocab_from_iterator(
-        yield_tokens(train_iter, ln),
-        min_freq=1,
-        specials=special_symbols,
-        special_first=True,
+    try:
+        spacy_en = spacy.load("en_core_web_sm")
+    except IOError:
+        os.system("python -m spacy download en_core_web_sm")
+        spacy_en = spacy.load("en_core_web_sm")
+
+    return spacy_de, spacy_en
+
+
+def tokenize(text, tokenizer):
+    return [tok.text for tok in tokenizer.tokenizer(text)]
+
+
+def yield_tokens(data_iter, tokenizer, index):
+    for from_to_tuple in data_iter:
+        yield tokenizer(from_to_tuple[index])
+
+
+def build_vocabulary(spacy_de, spacy_en):
+    def tokenize_de(text):
+        return tokenize(text, spacy_de)
+
+    def tokenize_en(text):
+        return tokenize(text, spacy_en)
+
+    print("Building German Vocabulary ...")
+    train = Multi30k(split="train", language_pair=("de", "en"))
+    val = Multi30k(split="valid", language_pair=("de", "en"))
+    test = Multi30k(split="test", language_pair=("de", "en"))
+    vocab_src = build_vocab_from_iterator(
+        yield_tokens(train + val + test, tokenize_de, index=0),
+        min_freq=2,
+        specials=["<s>", "</s>", "<blank>", "<unk>"],
     )
 
-# Set ``UNK_IDX`` as the default index. This index is returned when the token is not found.
-# If not set, it throws ``RuntimeError`` when the queried token is not found in the Vocabulary.
-for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
-    vocab_transform[ln].set_default_index(UNK_IDX)
-
-from torch.nn.utils.rnn import pad_sequence
-
-
-# helper function to club together sequential operations
-def sequential_transforms(*transforms):
-    def func(txt_input):
-        for transform in transforms:
-            txt_input = transform(txt_input)
-        return txt_input
-
-    return func
-
-
-# function to add BOS/EOS and create tensor for input sequence indices
-def tensor_transform(token_ids: List[int]):
-    return torch.cat(
-        (torch.tensor([BOS_IDX]), torch.tensor(token_ids), torch.tensor([EOS_IDX]))
+    print("Building English Vocabulary ...")
+    train = Multi30k(split="train", language_pair=("de", "en"))
+    val = Multi30k(split="valid", language_pair=("de", "en"))
+    test = Multi30k(split="test", language_pair=("de", "en"))
+    vocab_tgt = build_vocab_from_iterator(
+        yield_tokens(train + val + test, tokenize_en, index=1),
+        min_freq=2,
+        specials=["<s>", "</s>", "<blank>", "<unk>"],
     )
 
+    vocab_src.set_default_index(vocab_src["<unk>"])
+    vocab_tgt.set_default_index(vocab_tgt["<unk>"])
 
-# ``src`` and ``tgt`` language text transforms to convert raw strings into tensors indices
-text_transform = {}
-for ln in [SRC_LANGUAGE, TGT_LANGUAGE]:
-    text_transform[ln] = sequential_transforms(
-        token_transform[ln],  # Tokenization
-        vocab_transform[ln],  # Numericalization
-        tensor_transform,
-    )  # Add BOS/EOS and create tensor
+    return vocab_src, vocab_tgt
 
 
-# function to collate data samples into batch tensors
-def collate_fn(batch):
-    src_batch, tgt_batch = [], []
-    for src_sample, tgt_sample in batch:
-        src_batch.append(text_transform[SRC_LANGUAGE](src_sample.rstrip("\n")))
-        tgt_batch.append(text_transform[TGT_LANGUAGE](tgt_sample.rstrip("\n")))
+def load_vocab(spacy_de, spacy_en):
+    if not os.path.exists("vocab.pt"):
+        vocab_src, vocab_tgt = build_vocabulary(spacy_de, spacy_en)
+        torch.save((vocab_src, vocab_tgt), "vocab.pt")
+    else:
+        vocab_src, vocab_tgt = torch.load("vocab.pt")
+    print("Finished.\nVocabulary sizes:")
+    print(len(vocab_src))
+    print(len(vocab_tgt))
+    return vocab_src, vocab_tgt
 
-    src_batch = pad_sequence(src_batch, padding_value=PAD_IDX)
-    tgt_batch = pad_sequence(tgt_batch, padding_value=PAD_IDX)
-    return src_batch, tgt_batch
+
+# global variables used later in the script
+spacy_de, spacy_en = load_tokenizers()
+vocab_src, vocab_tgt = load_vocab(spacy_de, spacy_en)
+
+
+def collate_batch(
+    batch,
+    src_pipeline,
+    tgt_pipeline,
+    src_vocab,
+    tgt_vocab,
+    device,
+    max_padding=128,
+    pad_id=2,
+):
+    bs_id = torch.tensor([0], device=device)  # <s> token id
+    eos_id = torch.tensor([1], device=device)  # </s> token id
+    src_list, tgt_list = [], []
+    for _src, _tgt in batch:
+        processed_src = torch.cat(
+            [
+                bs_id,
+                torch.tensor(
+                    src_vocab(src_pipeline(_src)),
+                    dtype=torch.int64,
+                    device=device,
+                ),
+                eos_id,
+            ],
+            0,
+        )
+        processed_tgt = torch.cat(
+            [
+                bs_id,
+                torch.tensor(
+                    tgt_vocab(tgt_pipeline(_tgt)),
+                    dtype=torch.int64,
+                    device=device,
+                ),
+                eos_id,
+            ],
+            0,
+        )
+        src_list.append(
+            # warning - overwrites values for negative values of padding - len
+            F.pad(
+                processed_src,
+                (
+                    0,
+                    max_padding - len(processed_src),
+                ),
+                value=pad_id,
+            )
+        )
+        tgt_list.append(
+            F.pad(
+                processed_tgt,
+                (0, max_padding - len(processed_tgt)),
+                value=pad_id,
+            )
+        )
+
+    src = torch.stack(src_list)
+    tgt = torch.stack(tgt_list)
+    return (src, tgt)
+
+def create_dataloaders(
+    device,
+    vocab_src,
+    vocab_tgt,
+    spacy_de,
+    spacy_en,
+    batch_size=12000,
+    max_padding=128,
+    is_distributed=True,
+):
+    # def create_dataloaders(batch_size=12000):
+    def tokenize_de(text):
+        return tokenize(text, spacy_de)
+
+    def tokenize_en(text):
+        return tokenize(text, spacy_en)
+
+    def collate_fn(batch):
+        return collate_batch(
+            batch,
+            tokenize_de,
+            tokenize_en,
+            vocab_src,
+            vocab_tgt,
+            device,
+            max_padding=max_padding,
+            pad_id=vocab_src.get_stoi()["<blank>"],
+        )
+
+    train_iter, valid_iter, test_iter = Multi30k(
+        language_pair=("de", "en")
+    )
+
+    train_iter_map = to_map_style_dataset(
+        train_iter
+    )  # DistributedSampler needs a dataset len()
+    train_sampler = (
+        DistributedSampler(train_iter_map) if is_distributed else None
+    )
+    valid_iter_map = to_map_style_dataset(valid_iter)
+    valid_sampler = (
+        DistributedSampler(valid_iter_map) if is_distributed else None
+    )
+
+    train_dataloader = DataLoader(
+        train_iter_map,
+        batch_size=batch_size,
+        shuffle=(train_sampler is None),
+        sampler=train_sampler,
+        collate_fn=collate_fn,
+    )
+    valid_dataloader = DataLoader(
+        valid_iter_map,
+        batch_size=batch_size,
+        shuffle=(valid_sampler is None),
+        sampler=valid_sampler,
+        collate_fn=collate_fn,
+    )
+    return train_dataloader, valid_dataloader

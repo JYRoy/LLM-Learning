@@ -24,12 +24,10 @@ dropout = 0.2
 lr = 0.5
 bptt = 1024
 log_interval = 200
-src_vocab_size = len(vocab_transform[SRC_LANGUAGE])
-tgt_vocab_size = len(vocab_transform[TGT_LANGUAGE])
 
 model = make_model(
-    src_vocab_size,
-    src_vocab_size,
+    len(vocab_src),
+    len(vocab_tgt),
     N=nlayers,
     d_model=emsize,
     d_ff=nhid,
@@ -37,43 +35,56 @@ model = make_model(
     dropout=dropout,
 )
 
-criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss(ignore_index=-1).to("cuda")
 optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 
 source_mask = Variable(torch.ones(1, 1, batch_size)).to("cuda")
 
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    memory = model.encode(src, src_mask)
+    ys = torch.zeros(1, 1).fill_(start_symbol).type_as(src.data)
+    for i in range(max_len - 1):
+        out = model.decode(
+            memory, src_mask, ys, subsequent_mask(ys.size(1)).type_as(src.data)
+        )
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.data[0]
+        ys = torch.cat(
+            [ys, torch.zeros(1, 1).type_as(src.data).fill_(next_word)], dim=1
+        )
+    return ys
 
 def train_epoch():
+    pad_idx = vocab_tgt["<blank>"]
     model.train()
     model.to("cuda")
     losses = 0
-    train_iter = Multi30k(split="train", language_pair=(SRC_LANGUAGE, TGT_LANGUAGE))
-    train_dataloader = DataLoader(
-        train_iter, batch_size=batch_size, collate_fn=collate_fn
+    train_dataloader, valid_dataloader = create_dataloaders(
+        "cuda",
+        vocab_src,
+        vocab_tgt,
+        spacy_de,
+        spacy_en,
+        batch_size=batch_size,
+        max_padding=MAX_LEN,
+        is_distributed=False,
     )
 
-    for src, tgt in train_dataloader:
-        src = src.to("cuda")
-        tgt = tgt.to("cuda")
-
-        tgt_input = tgt[:-1, :]
-
-        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(
-            src, tgt_input
+    train_iter = (Batch(b[0], b[1], pad_idx) for b in train_dataloader)
+    for i, batch in enumerate(train_iter):
+        out = model.forward(
+            batch.src, batch.tgt, batch.src_mask, batch.tgt_mask
         )
-
-        logits = model(src, tgt_input, src_mask, tgt_mask)
-
         optimizer.zero_grad()
 
-        tgt_out = tgt[1:, :]
-        loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        loss = criterion(out.reshape(-1, out.shape[-1]), batch.tgt_y.reshape(-1))
         loss.backward()
 
         optimizer.step()
         losses += loss.item()
-        print("loss: " + str(loss))
+        print("loss: ", loss)
 
     return losses / len(list(train_dataloader))
 

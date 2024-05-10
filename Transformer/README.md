@@ -9,6 +9,8 @@
       - [Matrix Calculation of Self-Attention](#matrix-calculation-of-self-attention)
     - [Multi-head Attention](#multi-head-attention)
   - [Decoder](#decoder)
+    - [Masked Multi-head Attention](#masked-multi-head-attention)
+    - [Multi-head Attention](#multi-head-attention-1)
   - [Output](#output)
   - [Resources](#resources)
 
@@ -77,7 +79,32 @@ The multi-headed attention calculation process. It omits embedding dimension, on
 
 ## Decoder
 
+### Masked Multi-head Attention
+
+
+
+### Multi-head Attention
+
+
 ## Output
+
+The output is combined with a linear layer and log_softmax. The input size of the linear layer is d_model, and the output size is vocab_size since we want to predict a word from the target vocabulary. Then, log_softmax calculates the probability for each word.
+
+The reason for using log_softmax instead of normal softmax is that the input values may be so large that they cause the softmax to overflow.
+
+softmax:
+
+$$
+softmax(z_i) = \frac{e^{z_i}}{\sum_j{e^{z_j}}}
+$$
+
+log_softmax:
+
+$$
+log\_softmax(z_i) = log{\frac{e^{z_i - max(z)}}{\sum_j{e^{z_j - max(z)}}}} = (z_i - max(z)) - log(\sum_j{e^{z_j - max(z)}})
+$$
+
+When implementing log_softmax, the common way is the second formula since $z_i - max(z)$ maybe is a very small negative number, it will make $e^{z_i - max(z)}$ infinitely close to zero. After log, it will underflow.
 
 ## Resources
 

@@ -7,11 +7,11 @@ import torch.nn as nn
 class Embeddings(nn.Module):
     def __init__(self, vocab_size, emb_size):
         super(Embeddings, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_size)
+        self.embedding = nn.Embedding(vocab_size, emb_size, padding_idx=1)
         self.emb_size = emb_size
 
     def forward(self, tokens):
-        return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
+        return self.embedding(tokens) * math.sqrt(self.emb_size)
 
 
 # vocab = 1000
