@@ -48,7 +48,7 @@ Token Embedding + Segment Embedding + Position Embedding
 
 #### Formula
 $$
-Attention(Q, K, V) = softmax(\frac{QK^T}{\sqrt{d_k}}) V
+Attention(Q_{n\times{d_k}}, K_{n\times{d_k}}, V_{n\times{d_v}}) = softmax(\frac{Q_{n\times{d_k}}K_{d_k\times{n}}^T}{\sqrt{d_k}}) V_{n\times{d_v}} = Attention_{n\times{n}}V_{n\times{d_v}} = O_{n\times{d_v}}
 $$
 
 Q, K, V means Query vector, Key vector and Value Vector. These vectors are created by multiplying the embedding by three matrices $W^Q$, $W^K$, $W^V$ that we trained during the training process. The dimension of Q, K, V is smaller than embedding vector, for example, the embedding dim is 512 and we want the vector dimension is 64 so that the dimension of matrices is (512, 64).
@@ -79,12 +79,39 @@ The multi-headed attention calculation process. It omits embedding dimension, on
 
 ## Decoder
 
+![Decoder](.images/Decoder.PNG)
+
+- Decoder generates output one by one
+- N decoders
+- three sub-layer in each decoder
+- first sub-layer consists of a **masked** multi-head attention sub-layer and normalization layer with a residual connection
+- second sub-layer consists of a multi-head attention sub-layer and normalization layer with a residual connection. The key and value are come from encoder output. The query is coming from first layer of decoder
+- third sub-layer consists of a feed forward layer and normalization layer with a residual connection
+
 ### Masked Multi-head Attention
 
 
+$$
+Attention(Q_{n\times{d_k}}, K_{n\times{d_k}}, V_{n\times{d_v}}) = mask(softmax(\frac{Q_{n\times{d_k}}K_{d_k\times{n}}^T}{\sqrt{d_k}})) V_{n\times{d_v}} = mask(Attention_{n\times{n}})V_{n\times{d_v}} = O_{n\times{d_v}}
+$$
+
+Mask is only work on scores.
+
+![masked attention](.images/masked%20attention.PNG)
+
+The reason for masking input is that the predictions for position i can depand only on the known outputs at positions less than i.
+
+For output $o_1$, it only depand on input $v_1$. 
+
+![mask attention O1](.images/mask%20attention%20O1.PNG)
+
+For output $o_2$, it only depend on input $v1$ and $v2$.
+
+![mask attention O2](.images/mask%20attention%20O2.PNG)
 
 ### Multi-head Attention
 
+It is a normal self-attention. The only difference is that the key and value are come from encoder output. The query is coming from first layer of decoder.
 
 ## Output
 
