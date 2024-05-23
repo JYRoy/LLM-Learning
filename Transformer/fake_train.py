@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from model import *
-from data_generator import *
+from data.multi30k_dataset import *
 
 V = 512
 batch_size = 20

@@ -1,6 +1,5 @@
 import os
 
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torchtext.datasets import multi30k, Multi30k
@@ -12,6 +11,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from common import *
 
 # We need to modify the URLs for the dataset since the links to the original dataset are broken
 # Refer to https://github.com/pytorch/text/issues/1756#issuecomment-1163664163 for more info
@@ -38,53 +38,6 @@ MAX_LEN = 72
 # Place-holders
 token_transform = {}
 vocab_transform = {}
-
-
-def fake_data_generator(V, batch_size, num_batch):
-    for i in range(num_batch):
-        data = torch.from_numpy(np.random.randint(1, V, size=(batch_size, 10)))
-        data[:, 0] = 1
-
-        source = Variable(data, requires_grad=False).to("cuda")
-        target = Variable(data, requires_grad=False).to("cuda")
-
-        yield Batch(source, target)
-
-
-def subsequent_mask(size):
-    """mask subsequent tensor
-
-    size: the size of last two dimensions of the tensor
-    """
-    attn_shape = (1, size, size)
-    # upper triangular matrix
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
-    # lower triangular matrix
-    # 1 means masked, 0 means unmasked
-    # row means the current position
-    # col means the related postions with current position
-    # for example: the index 2(3 position) could see 2 tokens
-    return torch.from_numpy(1 - subsequent_mask)
-
-
-class Batch:
-    """Object for holding a batch of data with mask during training."""
-
-    def __init__(self, src, tgt=None, pad=2):  # 2 = <blank>
-        self.src = src
-        self.src_mask = (src != pad).unsqueeze(-2)
-        if tgt is not None:
-            self.tgt = tgt[:, :-1]
-            self.tgt_y = tgt[:, 1:]
-            self.tgt_mask = self.make_std_mask(self.tgt, pad)
-            self.ntokens = (self.tgt_y != pad).data.sum()
-
-    @staticmethod
-    def make_std_mask(tgt, pad):
-        "Create a mask to hide padding and future words."
-        tgt_mask = (tgt != pad).unsqueeze(-2)
-        tgt_mask = tgt_mask & subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
-        return tgt_mask
 
 
 def load_tokenizers():
@@ -223,6 +176,7 @@ def collate_batch(
     tgt = torch.stack(tgt_list)
     return (src, tgt)
 
+
 def create_dataloaders(
     device,
     vocab_src,
@@ -252,20 +206,14 @@ def create_dataloaders(
             pad_id=vocab_src.get_stoi()["<blank>"],
         )
 
-    train_iter, valid_iter, test_iter = Multi30k(
-        language_pair=("de", "en")
-    )
+    train_iter, valid_iter, test_iter = Multi30k(language_pair=("de", "en"))
 
     train_iter_map = to_map_style_dataset(
         train_iter
     )  # DistributedSampler needs a dataset len()
-    train_sampler = (
-        DistributedSampler(train_iter_map) if is_distributed else None
-    )
+    train_sampler = DistributedSampler(train_iter_map) if is_distributed else None
     valid_iter_map = to_map_style_dataset(valid_iter)
-    valid_sampler = (
-        DistributedSampler(valid_iter_map) if is_distributed else None
-    )
+    valid_sampler = DistributedSampler(valid_iter_map) if is_distributed else None
 
     train_dataloader = DataLoader(
         train_iter_map,
