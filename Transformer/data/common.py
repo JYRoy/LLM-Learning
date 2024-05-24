@@ -15,7 +15,7 @@ def subsequent_mask(size):
     # row means the current position
     # col means the related postions with current position
     # for example: the index 2(3 position) could see 2 tokens
-    return torch.from_numpy(1 - subsequent_mask)
+    return torch.from_numpy(1 - subsequent_mask)  # subsequent_mask == 0
 
 
 class Batch:

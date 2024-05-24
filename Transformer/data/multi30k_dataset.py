@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from common import *
+from .common import *
 
 # We need to modify the URLs for the dataset since the links to the original dataset are broken
 # Refer to https://github.com/pytorch/text/issues/1756#issuecomment-1163664163 for more info
@@ -44,13 +44,13 @@ def load_tokenizers():
     try:
         spacy_de = spacy.load("de_core_news_sm")
     except IOError:
-        os.system("python -m spacy download de_core_news_sm")
+        os.system("python3 -m spacy download de_core_news_sm")
         spacy_de = spacy.load("de_core_news_sm")
 
     try:
         spacy_en = spacy.load("en_core_web_sm")
     except IOError:
-        os.system("python -m spacy download en_core_web_sm")
+        os.system("python3 -m spacy download en_core_web_sm")
         spacy_en = spacy.load("en_core_web_sm")
 
     return spacy_de, spacy_en

@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 
-from common import *
+from .common import *
 
 def fake_data_generator(V, batch_size, num_batch):
     for i in range(num_batch):

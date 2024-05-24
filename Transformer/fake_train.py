@@ -4,44 +4,41 @@ from pyitcast.transformer_utils import (
     SimpleLossCompute,
     run_epoch,
     greedy_decode,
-    TransformerModel
 )
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model import *
+from model.model import *
 from data.multi30k_dataset import *
 
-V = 512
-batch_size = 20
-num_batch = 30
 
-model = make_model(V, V, N=2)
+def inference_test():
+    test_model = make_model(11, 11, 2)
+    test_model.eval()
+    src = torch.LongTensor([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
+    src_mask = torch.ones(1, 1, 10)
 
-model_optimizer = get_std_opt(model)
+    memory = test_model.encode(src, src_mask)
+    ys = torch.zeros(1, 1).type_as(src)
 
-criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
+    for i in range(9):
+        out = test_model.decode(
+            memory, src_mask, ys, subsequent_mask(ys.size(1)).type_as(src.data)
+        )
+        prob = test_model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.data[0]
+        ys = torch.cat(
+            [ys, torch.empty(1, 1).type_as(src.data).fill_(next_word)], dim=1
+        )
 
-loss = SimpleLossCompute(model.generator, criterion, model_optimizer)
+    print("Example Untrained Model Prediction:", ys)
 
 
-def run(model, loss, epochs=10):
-    model.to("cuda")
-    for _ in range(epochs):
-        model.train()
-        run_epoch(fake_data_generator(V, batch_size, num_batch), model, loss)
-        model.eval()
-        run_epoch(fake_data_generator(V, batch_size, num_batch), model, loss)
-
-    model.eval()
-
-    source = Variable(torch.LongTensor([[1, 3, 2, 5, 4, 6, 7, 8, 9, 10]])).to("cuda")
-
-    source_mask = Variable(torch.ones(1, 1, 10)).to("cuda")
-
-    result = greedy_decode(model, source, source_mask, max_len=10, start_symbol=1)
-    print(result)
+def run_tests():
+    for _ in range(10):
+        inference_test()
 
 
 if __name__ == "__main__":
-    run(model, loss, 20)
+    run_tests()
