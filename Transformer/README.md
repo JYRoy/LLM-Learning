@@ -12,6 +12,7 @@
     - [Masked Multi-head Attention](#masked-multi-head-attention)
     - [Multi-head Attention](#multi-head-attention-1)
   - [Output](#output)
+  - [Multi30k Dataset](#multi30k-dataset)
   - [Resources](#resources)
 
 
@@ -132,6 +133,10 @@ log\_softmax(z_i) = log{\frac{e^{z_i - max(z)}}{\sum_j{e^{z_j - max(z)}}}} = (z_
 $$
 
 When implementing log_softmax, the common way is the second formula since $z_i - max(z)$ maybe is a very small negative number, it will make $e^{z_i - max(z)}$ infinitely close to zero. After log, it will underflow.
+
+## Multi30k Dataset
+
+
 
 ## Resources
 

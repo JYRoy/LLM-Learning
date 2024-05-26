@@ -10,3 +10,5 @@ portalocker==2.6.0
 requests==2.31.0
 ws4py
 urllib3==1.26.12
+pandas==2.2.2
+altair==5.3.0

@@ -4,12 +4,12 @@ import numpy as np
 
 from .common import *
 
-def fake_data_generator(V, batch_size, num_batch):
-    for i in range(num_batch):
-        data = torch.from_numpy(np.random.randint(1, V, size=(batch_size, 10)))
-        data[:, 0] = 1
 
-        source = Variable(data, requires_grad=False).to("cuda")
-        target = Variable(data, requires_grad=False).to("cuda")
-
-        yield Batch(source, target)
+def data_gen(V, batch_size, nbatches):
+    "Generate random data for a src-tgt copy task."
+    for i in range(nbatches):
+        data = torch.randint(1, V, size=(batch_size, 10))  # (batch_size, seq_len)
+        data[:, 0] = 1  # change the first token to 1
+        src = data.requires_grad_(False).clone().detach()
+        tgt = data.requires_grad_(False).clone().detach()
+        yield Batch(src, tgt, 0)

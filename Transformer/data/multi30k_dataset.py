@@ -41,6 +41,7 @@ vocab_transform = {}
 
 
 def load_tokenizers():
+    """Load spacy tokenizer models, download them if they haven't been downloaded already"""
     try:
         spacy_de = spacy.load("de_core_news_sm")
     except IOError:
@@ -187,7 +188,6 @@ def create_dataloaders(
     max_padding=128,
     is_distributed=True,
 ):
-    # def create_dataloaders(batch_size=12000):
     def tokenize_de(text):
         return tokenize(text, spacy_de)
 
