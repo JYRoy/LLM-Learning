@@ -132,7 +132,6 @@ def train_worker(
     )
     model.cuda(gpu)
     is_main_process = True
-    model.load_state_dict(torch.load("ckpt/multi30k_model_final.pt"))
 
     train_dataloader, valid_dataloader = create_dataloaders(
         gpu,
@@ -199,8 +198,8 @@ def train_model(vocab_src, vocab_tgt, spacy_de, spacy_en, config):
 
 def load_trained_model():
     model_path = "ckpt/multi30k_model_final.pt"
-    if not exists(model_path):
-        train_model(vocab_src, vocab_tgt, spacy_de, spacy_en, config)
+    # if not exists(model_path):
+    train_model(vocab_src, vocab_tgt, spacy_de, spacy_en, config)
 
     model = make_model(
         len(vocab_src),
@@ -286,4 +285,4 @@ def run_model_example(n_examples=5):
 
 if __name__ == "__main__":
     model = load_trained_model()
-    run_model_example()
+    # run_model_example()

@@ -106,8 +106,8 @@ class EncoderLayer(nn.Module):
         self.size = size
 
     def forward(self, x, mask):
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))  # first layer
-        return self.sublayer[1](x, self.feed_forward)  # second layer
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))  # first layer, x shape (batch_size, seq_len, embed_size)
+        return self.sublayer[1](x, self.feed_forward)  # second layer, output shape (batch_size, seq_len, embed_size)
 
 
 class Encoder(nn.Module):
@@ -239,10 +239,11 @@ def attention(query, key, value, mask=None, dropout=None):
     mask: mask tensor
     dropout: Dropout instance
     """
-    d_k = query.size(-1)  # get token embedding size
+    # shape: [batch_size, head, seq_len, embed_size/head]
+    d_k = query.size(-1)  # get token embed_size/head which is the size of each head
 
     # calculate scores
-    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)  # (batch_size, head, seq_len, seq_len)
 
     # mask fill
     if mask is not None:
@@ -252,10 +253,10 @@ def attention(query, key, value, mask=None, dropout=None):
     p_atten = torch.softmax(scores, dim=-1)
 
     if dropout is not None:
-        p_atten = dropout(p_atten)
+        p_atten = dropout(p_atten)  # (batch_size, head, seq_len, seq_len)
 
     # calculate attention value
-    attn_val = torch.matmul(p_atten, value)
+    attn_val = torch.matmul(p_atten, value)  # (batch_size, head, seq_len, embed_size)
     return attn_val, p_atten
 
 
@@ -288,7 +289,7 @@ class MultiHeadedAttention(nn.Module):
         if mask is not None:
             mask = mask.unsqueeze(1)  # expand the first dimension
 
-        batch_size = query.size(0)  # get batch size
+        batch_size = query.size(0)  # get batch size, (batchsize, seq_len, embed_size)
 
         # linear transform for V, K, Q
         # linear dimension equals to embedding_dim(512), but it splitted into 8 heads
@@ -296,20 +297,21 @@ class MultiHeadedAttention(nn.Module):
         query, key, value = [
             model(x)
             .view(batch_size, -1, self.head, self.d_k)
-            .transpose(1, 2)  # [batch_size, head(8), seq_len, 64]
+            .transpose(1, 2)  # [batch_size, head, seq_len, embed_size/head]
             for model, x in zip(self.linears, (query, key, value))
         ]
-
+        
         # calculate attention
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
 
         # re-transpose 1, 2 dimension
+        # before x: (batch_size, head, seq_len, embed_size)
         x = (
             x.transpose(1, 2).contiguous().view(batch_size, -1, self.head * self.d_k)
-        )  # [seq_len, batchsize, 512]
+        )  # [batchsize, seq_len, embed_size]
 
         # last linear transpose
-        return self.linears[-1](x)  # [batchsize, seq_len, 512]
+        return self.linears[-1](x)  # [batchsize, seq_len, embed_size]
 
 
 class PositionwiseFeedForward(nn.Module):
@@ -361,18 +363,19 @@ class PositionEncoding(nn.Module):
 
         self.dropout = nn.Dropout(p=dropout)
 
-        # position encoding matrix, size is (max_len, d_model)
+        # initialize position encoding matrix (max_len, d_model)
         pe = torch.zeros(max_len, d_model)
 
         # absolute position encoding
-        position = torch.arange(0, max_len).unsqueeze(1)  # size is (max_len, 1)
+        position = torch.arange(0, max_len)  # (max_len)
+        position = position.unsqueeze(1)  # (max_len, 1)
 
         # sin or cos functions of differnent frequencies which is same as paper description
-        i = torch.arange(0, d_model, 2)
+        i = torch.arange(0, d_model // 2, 1)
         div = 10000.0 ** (2 * i / d_model)
-        term = position / div
-        pe[:, 0::2] = torch.sin(term)
-        pe[:, 1::2] = torch.cos(term)
+        term = position / div  # (max_len, d_model // 2)
+        pe[:, 0::2] = torch.sin(term)  # [0, 2, 4, 6, ...]
+        pe[:, 1::2] = torch.cos(term)  # [1, 3, 5, 7, ...]
 
         # show position encoding
         # plt.figure(1)
@@ -380,15 +383,16 @@ class PositionEncoding(nn.Module):
         # plt.savefig('.images/position_encoding.jpg',bbox_inches='tight')
         # plt.show()
 
-        pe = pe.unsqueeze(-2)
+        pe = pe.unsqueeze(0)  # (1, max_len, d_model), in order to match input shape
 
         # position is not the trainable parameter
         self.register_buffer("pe", pe)
 
     def forward(self, x):
         """
-        x: token embedding from embedding module
+        x: token embedding from embedding module, (batchsize, max_seq_len, d_model)
         """
-        # resize max_len dimension to x length
-        x = x + Variable(self.pe[: x.size(0), :], requires_grad=False)
+        # resize max_len dimension to x seq length
+        # self.pe[:, : x.size(1)]: (1, max_seq_len, d_model)
+        x = x + Variable(self.pe[:, : x.size(1)], requires_grad=False)
         return self.dropout(x)

@@ -28,7 +28,7 @@ Token Embedding + Segment Embedding + Position Embedding
 - Position Encoding: sin/cos position encoding
   - ![sin_cos_formula.PNG](.images/sin_cos_formula.PNG)
     - pos: absolute position index
-    - i: from 0 to embedding length, like (0, 512) if we want 512 embedding length for the token
+    - i: from 0 to half embedding length, like (0, 256) if we want 512 embedding length for the token, 
     - 2i: odd position in embedding, this value is calculated from sin
     - 2i+1: even position in embedding, this value is calculated from cos
   - this way ensures different value for each token between 1 and -1
