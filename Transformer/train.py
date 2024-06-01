@@ -1,6 +1,7 @@
 import sys
 
 sys.path.append("..")
+import argparse
 import os
 from os.path import exists
 import time
@@ -284,5 +285,15 @@ def run_model_example(n_examples=5):
 
 
 if __name__ == "__main__":
-    model = load_trained_model()
-    # run_model_example()
+    parser = argparse.ArgumentParser(description="选择运行模式")
+    parser.add_argument("--train", action="store_true", help="加载训练模型")
+    parser.add_argument("--infer", action="store_true", help="运行模型示例")
+
+    args = parser.parse_args()
+
+    if args.train:
+        load_trained_model()
+    elif args.infer:
+        run_model_example()
+    else:
+        print("请指定运行模式：--train 加载训练模型 或 --infer 运行模型示例")
