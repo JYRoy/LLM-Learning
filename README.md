@@ -17,8 +17,9 @@ Learning how to build and fine-tune some large language models from scratch inps
 
 Here are the models and algorithms I implemented and noted.
 
-- Bigram
-- Transformer
+- [Bigram](./Bigram/README.md)
+- [Transformer](./Transformer/README.md)
+- [BERT](./BERT/README.md)
 
 ## Awesome LLM
 
