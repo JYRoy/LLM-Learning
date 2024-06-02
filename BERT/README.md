@@ -65,7 +65,7 @@ There are three gourps of trainable parameters:
 - MLP(Feed Forward)
   - There are tow matrix, first is $H \times 4H$, second is $4H \times H$. The result is $H^2 \times 8$
 
-Since BERT has 6 layers as L, the total parameters is $30K \times H + L \times H^2 \times 12$
+The total parameters is $30K \times H + L \times H^2 \times 12$
 
 - BERT Base: $30000 \times 768 + 12 \times 768^2 \times 12 = 107974656 = 110M$
 - BERT Large: $30000 \times 1024 + 16 \times 1024^2 \times 12 = 332709888 = 340M$

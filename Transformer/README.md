@@ -129,7 +129,7 @@ $$
 log_softmax:
 
 $$
-log\_softmax(z_i) = log{\frac{e^{z_i - max(z)}}{\sum_j{e^{z_j - max(z)}}}} = (z_i - max(z)) - log(\sum_j{e^{z_j - max(z)}})
+logsoftmax(z_i) = log{\frac{e^{z_i - max(z)}}{\sum_j{e^{z_j - max(z)}}}} = (z_i - max(z)) - log(\sum_j{e^{z_j - max(z)}})
 $$
 
 When implementing log_softmax, the common way is the second formula since $z_i - max(z)$ maybe is a very small negative number, it will make $e^{z_i - max(z)}$ infinitely close to zero. After log, it will underflow.
