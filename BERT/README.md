@@ -163,3 +163,4 @@ Introduce a start vector S and an end vector E during fine-tuning. The probabili
 - [BERT (预训练Transformer模型) by Wang Shusen](https://youtu.be/UlC6AjQWao8?si=i2AqejsiNZjFGkJi)
 - [【機器學習2021】自督導式學習 (Self-supervised Learning) (二) – BERT簡介 by Hung-yi Lee](https://youtu.be/gh0hewYkjgo?si=YfGVFwq7JYXLjBQA)
 - [台大資訊 深度學習之應用 | ADL 10.1 BERT 進擊的芝麻街巨人 by 陳縕儂 Vivian NTU MiuLab](https://youtu.be/XS44fSQP0-E?si=xC9psSQ8NIhT-cNZ)
+- [Building BERT with PyTorch from scratch](https://coaxsoft.com/blog/building-bert-with-pytorch-from-scratch)
