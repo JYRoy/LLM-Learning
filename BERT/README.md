@@ -5,7 +5,7 @@
   - [Architecture](#architecture)
     - [Multi-head attention](#multi-head-attention)
     - [Parameter Calculation](#parameter-calculation)
-  - [Input/Output Representation](#inputoutput-representation)
+    - [Input/Output Representation](#inputoutput-representation)
   - [Pre-training BERT](#pre-training-bert)
     - [Masked LM](#masked-lm)
     - [Next Sentence Prediction(NSP)](#next-sentence-predictionnsp)
@@ -70,7 +70,7 @@ The total parameters is $30K \times H + L \times H^2 \times 12$
 - BERT Base: $30000 \times 768 + 12 \times 768^2 \times 12 = 107974656 = 110M$
 - BERT Large: $30000 \times 1024 + 16 \times 1024^2 \times 12 = 332709888 = 340M$
 
-## Input/Output Representation
+### Input/Output Representation
 
 In order to handle variety down-stream tasks, the input representation has tow kinds:
 1. single sentence, an arbitrary span of contiguous text;

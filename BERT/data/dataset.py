@@ -38,6 +38,8 @@ OPTIMAL_LENGTH_PERCENTILE = 70
 25488  [0, 571, 462, 4224, 2, 7059, 2782, 25, 6607, 1...  [0, 571, 462, 4224, 2, 7059, 2782, 25, 6607, 1...  [True, True, True, True, False, False, True, T...        1
 25489  [0, 55, 4, 2, 2, 55, 1253, 30, 2778, 57, 55, 2...  [0, 55, 4, 2, 2, 55, 1253, 30, 2778, 57, 55, 2...  [True, True, True, False, False, True, True, T...        0
 """
+
+
 class IMDBBertDataset(Dataset):
 
     def __init__(self, path):
@@ -209,7 +211,7 @@ class IMDBBertDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
-    def __get_item__(self, idx):
+    def __getitem__(self, idx):
         item = self.df.iloc[idx]
         masked_indices = torch.Tensor(item[MASKED_INDICES_COLUMN]).long()
         token_mask = torch.Tensor(item[TOKEN_MASK_COLUMN]).bool()
@@ -234,6 +236,3 @@ class IMDBBertDataset(Dataset):
             target_indices.cuda(),
             nsp_target.cuda(),
         )
-
-
-dataset = IMDBBertDataset("../../data/IMDB/IMDB Dataset.csv")
