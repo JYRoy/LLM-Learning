@@ -19,11 +19,10 @@ class JointEmbedding(nn.Module):
         """
         input_tensor: dimension (batch_size, seq_len)
         """
-
         sentence_size = input_tensor.size(-1)
         segment_tensor = torch.zeros_like(input_tensor).to(device)
         segment_tensor[:, sentence_size // 2 + 1 :] = 1
-        pos_tensor = self.numeric_position(self.size, input_tensor)
+        pos_tensor = self.numeric_position(sentence_size, input_tensor)
         output = (
             self.token_emb(input_tensor)
             + self.segment_emb(segment_tensor)
@@ -57,7 +56,7 @@ class AttentionHead(nn.Module):
 
         scale = query.size(1) ** 0.5
         scores = torch.bmm(query, key.transpose(1, 2)) / scale
-        scores = scores.mask_fill_(attention_mask, -1e9)
+        scores = scores.masked_fill_(attention_mask, -1e9)
 
         attn = f.softmax(scores, dim=-1)
         context = torch.bmm(attn, value)

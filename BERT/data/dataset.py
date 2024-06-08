@@ -146,15 +146,13 @@ class IMDBBertDataset(Dataset):
         return sentences[sentences_index], sentences[next_sentences_index]
 
     def _preprocess_sentence(self, sentence, should_mask):
-        inverse_token_mask = None
+        inverse_token_mask = []
         if should_mask:
             sentence, inverse_token_mask = self._mask_sentence(sentence)
-            padded_masked_sentence, inverse_token_mask = self._pad_sentence(
-                [CLS] + sentence, [True] + inverse_token_mask
-            )
-            return padded_masked_sentence, inverse_token_mask
-        else:
-            return self._pad_sentence([CLS] + sentence, [True])
+        padded_masked_sentence, inverse_token_mask = self._pad_sentence(
+            [CLS] + sentence, [True] + inverse_token_mask
+        )
+        return padded_masked_sentence, inverse_token_mask
 
     def _mask_sentence(self, sentence):
         """
@@ -183,7 +181,7 @@ class IMDBBertDataset(Dataset):
     def _pad_sentence(self, sentence, inverse_token_mask):
         sentence_length = len(sentence)
         if sentence_length >= self.optimal_sentence_length:
-            new_sentence = sentence[:sentence_length]
+            new_sentence = sentence[: self.optimal_sentence_length]
         else:
             new_sentence = sentence + [PAD] * (
                 self.optimal_sentence_length - sentence_length
@@ -228,7 +226,7 @@ class IMDBBertDataset(Dataset):
         else:
             t = [0, 1]  # next sentence
 
-        nsp_target = torch.Tenosr(t)
+        nsp_target = torch.Tensor(t)
         return (
             masked_indices.cuda(),
             attention_mask.cuda(),
