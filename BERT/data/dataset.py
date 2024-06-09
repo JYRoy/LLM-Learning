@@ -17,8 +17,10 @@ SEP = "[SEP]"
 MASK = "[MASK]"
 UNK = "[UNK]"
 MASK_PERCENTAGE = 0.15  # How much words to mask
+MASKED_COLUMN = "mask_sentence"
 MASKED_INDICES_COLUMN = "masked_indices"
-TARGET_COLUMN = "indices"
+TARGET_COLUMN = "original_sentence"
+TARGET_INDICES_COLUMN = "original_sentence_indices"
 NSP_TARGET_COLUMN = "is_next"
 TOKEN_MASK_COLUMN = "token_mask"
 OPTIMAL_LENGTH_PERCENTILE = 70
@@ -44,13 +46,15 @@ class IMDBBertDataset(Dataset):
 
     def __init__(self, path):
         self.columns = [
+            MASKED_COLUMN,
             MASKED_INDICES_COLUMN,
             TARGET_COLUMN,
+            TARGET_INDICES_COLUMN,
             TOKEN_MASK_COLUMN,
             NSP_TARGET_COLUMN,
         ]
         self.ds = pd.read_csv(path)["review"]
-        self.ds = self.ds[0:1000]  # cut the dataset
+        self.ds = self.ds[:20000]  # cut the dataset
         self.tokenizer = get_tokenizer("basic_english")
         self.optimal_sentence_length = None
         self.counter = Counter()  # token counter map, {"AAA": 2, "BB": 1}
@@ -64,16 +68,24 @@ class IMDBBertDataset(Dataset):
         # split dataset on sentences
         print("Get all sentences")
         for review in tqdm(self.ds):
-            review_sentences = review.split(".")  # split a review into serval sentences
+            review_sentences = review.split(
+                ". "
+            )  # split a review into serval sentences
             sentences += review_sentences  # collect all sentensens of reviewes
-            for v in sentences:
-                sentence_len = len(v.split())
-                sentence_lens.append(sentence_len)  # collect length of each sequence
-        sentence_lens = np.array(sentence_lens)
-        self.optimal_sentence_length = int(
-            np.percentile(sentence_lens, OPTIMAL_LENGTH_PERCENTILE)
-        )  # get the value of length percentile, e.g. 27 in IMDB
-
+        #     if len(review_sentences) > 1:
+        #         for v in sentences:
+        #             if len(v) <= 5:
+        #                 continue
+        #             sentence_len = len(v.split())
+        #             sentence_lens.append(
+        #                 sentence_len
+        #             )  # collect length of each sequence
+        # sentence_lens = np.array(sentence_lens)
+        # self.optimal_sentence_length = int(
+        #     np.percentile(sentence_lens, OPTIMAL_LENGTH_PERCENTILE)
+        # )  # get the value of length percentile, e.g. 27 in IMDB
+        # print("self.optimal_sentence_length: ", self.optimal_sentence_length)
+        self.optimal_sentence_length = 27
         print("Create vocabulary")
         for sentence in tqdm(sentences):
             tok = self.tokenizer(sentence)  # list
@@ -83,9 +95,11 @@ class IMDBBertDataset(Dataset):
 
         print("Preprocessing dataset")
         for review in tqdm(self.ds):
-            review_sentences = review.split(".")
+            review_sentences = review.split(". ")
             if len(review_sentences) > 1:
                 for i in range(len(review_sentences) - 1):
+                    if len(review_sentences[i]) <= 5:
+                        continue
                     # positive sample: next sentences pair
                     first, second = self.tokenizer(review_sentences[i]), self.tokenizer(
                         review_sentences[i + 1]
@@ -100,10 +114,10 @@ class IMDBBertDataset(Dataset):
     def _create_item(self, first, second, target):
         # mask and pad original sentences
         padded_masked_first_sentence, first_mask = self._preprocess_sentence(
-            first, True
+            first.copy(), True
         )
         padded_masked_second_sentence, second_mask = self._preprocess_sentence(
-            second, True
+            second.copy(), True
         )
 
         # create nsp sentence pair
@@ -115,21 +129,14 @@ class IMDBBertDataset(Dataset):
         )
         inverse_token_mask = first_mask + [True] + second_mask
 
-        original_fisrt, _ = self._preprocess_sentence(first, False)
-        original_second, _ = self._preprocess_sentence(second, False)
+        original_fisrt, _ = self._preprocess_sentence(first.copy(), False)
+        original_second, _ = self._preprocess_sentence(second.copy(), False)
         original_nsp_sentence = original_fisrt + [SEP] + original_second
         original_nsp_sentence_indices = self.vocab.lookup_indices(original_nsp_sentence)
-
-        """
-        self.columns = [
-            MASKED_INDICES_COLUMN,
-            TARGET_COLUMN,
-            TOKEN_MASK_COLUMN,
-            NSP_TARGET_COLUMN,
-        ]
-        """
         return (
+            padded_masked_nsp_sentence,
             padded_masked_nsp_sentence_indices,
+            original_nsp_sentence,
             original_nsp_sentence_indices,
             inverse_token_mask,
             target,
@@ -149,10 +156,11 @@ class IMDBBertDataset(Dataset):
         inverse_token_mask = []
         if should_mask:
             sentence, inverse_token_mask = self._mask_sentence(sentence)
-        padded_masked_sentence, inverse_token_mask = self._pad_sentence(
+        sentence, inverse_token_mask = self._pad_sentence(
             [CLS] + sentence, [True] + inverse_token_mask
         )
-        return padded_masked_sentence, inverse_token_mask
+
+        return sentence, inverse_token_mask
 
     def _mask_sentence(self, sentence):
         """
@@ -211,9 +219,11 @@ class IMDBBertDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self.df.iloc[idx]
+        masked_sentence = item[MASKED_COLUMN]
         masked_indices = torch.Tensor(item[MASKED_INDICES_COLUMN]).long()
         token_mask = torch.Tensor(item[TOKEN_MASK_COLUMN]).bool()
-        target_indices = torch.Tensor(item[TARGET_COLUMN]).long()
+        original_target = item[TARGET_COLUMN]
+        target_indices = torch.Tensor(item[TARGET_INDICES_COLUMN]).long()
         target_indices = target_indices.masked_fill_(
             token_mask, 0
         )  # only save the masked token indices, unmasked intergers in target to 0, we only want the model to predict masked tokens
@@ -228,9 +238,11 @@ class IMDBBertDataset(Dataset):
 
         nsp_target = torch.Tensor(t)
         return (
+            masked_sentence,
             masked_indices.cuda(),
             attention_mask.cuda(),
             token_mask.cuda(),
+            original_target,
             target_indices.cuda(),
             nsp_target.cuda(),
         )

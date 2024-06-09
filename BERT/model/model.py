@@ -1,3 +1,4 @@
+import copy
 import torch
 from torch import nn
 import torch.nn.functional as f
@@ -105,11 +106,18 @@ class Encoder(nn.Module):
 
 
 class BERT(nn.Module):
-    def __init__(self, vocab_size, dim_inp, dim_out, attention_heads):
+    def __init__(self, num_layers, vocab_size, dim_inp, dim_out, attention_heads):
         super(BERT, self).__init__()
 
         self.embedding = JointEmbedding(vocab_size, dim_inp)
-        self.encoder = Encoder(dim_inp, dim_out, attention_heads)
+        self.layers = nn.ModuleList(
+            [
+                copy.deepcopy(
+                    Encoder(dim_inp, dim_out, attention_heads),
+                )
+                for _ in range(num_layers)
+            ]
+        )
 
         self.token_prediction_layer = nn.Linear(dim_inp, vocab_size)
         self.softmax = nn.LogSoftmax(dim=-1)
@@ -117,8 +125,10 @@ class BERT(nn.Module):
 
     def forward(self, input_tensor, attention_mask):
         embedded = self.embedding(input_tensor)
-        encoded = self.encoder(embedded, attention_mask)
+        # encoded = self.encoder(embedded, attention_mask)
+        for layer in self.layers:
+            embedded = layer(embedded, attention_mask)
 
-        token_predictions = self.token_prediction_layer(encoded)
-        first_word = encoded[:, 0, :]
+        token_predictions = self.token_prediction_layer(embedded)
+        first_word = embedded[:, 0, :]
         return self.softmax(token_predictions), self.classification_layer(first_word)

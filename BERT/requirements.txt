@@ -1,4 +1,5 @@
 torch==2.2.0
 torchtext==0.17.0
 pandas==2.2.2
-numpy
+numpy==1.26.3
+tensorboard==2.17.0
