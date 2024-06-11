@@ -20,6 +20,8 @@ Here are the models and algorithms I implemented and noted.
 - [Bigram](./Bigram/README.md)
 - [Transformer](./Transformer/README.md)
 - [BERT](./BERT/README.md)
+- [GPT1.0](./GPT1/README.md)
+- [GPT2.0](./GPT2/README.md)
 
 ## Awesome LLM
 
