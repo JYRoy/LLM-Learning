@@ -14,7 +14,7 @@ Language Models are Unsupervised Multitask Learners
 
 ## Architecture
 
-GPT2 still use Transformer decoder. There are four model size in the GPT2 mini-series. The biggest one is a 1.5B parameter Transformer. We usually called the biggest one as GPT2.
+GPT2 still use Transformer decoder without cross multi-head attention. There are four model size in the GPT2 mini-series. The biggest one is a 1.5B parameter Transformer. We usually called the biggest one as GPT2.
 
 | Parameters | Layers | d_model |
 | ---------- | ------ | ------- |
@@ -22,6 +22,11 @@ GPT2 still use Transformer decoder. There are four model size in the GPT2 mini-s
 | 345M       | 24     | 1024    |
 | 762M       | 36     | 1280    |
 | 1542M      | 48     | 1600    |
+
+The main two changes are:
+
+1. Layer normalization was moved to the input of each sub-block, similar to a pre-activation residual network.
+2. An additional layer normalization was added after the final self-attention block.
 
 ## Zero-shot
 
