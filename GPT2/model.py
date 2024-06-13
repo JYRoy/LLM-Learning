@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
-from torch.nn import funcational as F
+from torch.nn import functional as F
 
 
 class CausalSelfAttention(nn.Module):
@@ -57,7 +57,7 @@ class MLP(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
-        self.gelu = nn.Linear(approximate="tanh")
+        self.gelu = nn.GELU(approximate="tanh")
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 
     def forward(self, x):
@@ -115,3 +115,49 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(
             config.n_embd, config.vocab_size, bias=False
         )  # output linear
+
+    @classmethod
+    def from_pretrained(cls, model_type):
+        """Loads pretrained GPT2 model weight from huggingface"""
+        from transformers import GPT2LMHeadModel
+
+        config_args = {"gpt2": dict(n_layer=12, n_head=12, n_embd=768)}["gpt2"]
+
+        config_args["vocab_size"] = 50257
+        config_args["block_size"] = 1024
+        config = GPTConfig(**config_args)
+        model = GPT(config)
+        sd = model.state_dict()
+        sd_keys = sd.keys()
+        sd_keys = [
+            k for k in sd_keys if not k.endswith(".attn.bias")
+        ]  # discard mask or buffer, they are not parameters
+
+        model_hf = GPT2LMHeadModel.from_pretrained("gpt2")
+        sd_hf = model_hf.state_dict()
+
+        sd_keys_hf = sd_hf.keys()
+        sd_keys_hf = [
+            k for k in sd_keys_hf if not k.endswith(".attn.masked_bias")
+        ]  # ignore buffer
+        sd_keys_hf = [
+            k for k in sd_keys_hf if not k.endswith(".attn.bias")
+        ]  # ignore buffer
+        transposed = [
+            "attn.c_attn.weight",
+            "attn.c_proj.weight",
+            "mlp.c_fc.weight",
+            "mlp.c_proj.weight",
+        ]  # these weights will be transposed since OpenAI use Conv1D module to implement linear
+        for k in sd_keys_hf:
+            if any(k.endswith(w) for w in transposed):
+                with torch.no_grad():  # todo: why needs use torch.no_grad()
+                    sd[k].copy_(sd_hf[k].t())
+            else:
+                with torch.no_grad():
+                    sd[k].copy_(sd_hf[k])
+
+        return model
+
+
+model = GPT.from_pretrained("gpt2")
