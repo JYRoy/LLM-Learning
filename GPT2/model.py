@@ -10,8 +10,9 @@ class CausalSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
-        # get qkv in one maxtic calculation
+        # get qkv in one maxtic calculation that concat weight Q, K, V into one weight as linear
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
+        # output projection
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
 
         self.n_head = config.n_head
@@ -29,7 +30,10 @@ class CausalSelfAttention(nn.Module):
         B, T, C = x.size()  # batch size, sequence length, embedding dimension (n_embd)
         # nh is "number of heads", hs is "head size", C is "number of channels" = nh * hs
         qkv = self.c_attn(x)
-        q, k, v = qkv.split(self.n_embd, dim=2)
+        q, k, v = qkv.split(self.n_embd, dim=2)  # batch size, seq len, n_embd
+
+        # split n_embd into serveral heads so that dim2 means n_heads and dim3 means C(n_embd) // n_heads
+        # it means that each head for q/k/v has C // n_heads(hs) embedding dimensions
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(
             1, 2
         )  # (B, nh, T, hs)
@@ -40,8 +44,10 @@ class CausalSelfAttention(nn.Module):
             1, 2
         )  # (B, nh, T, hs)
         # attention (materializes the large (T, T) matrix for all the queries and keys)
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.mask_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
+        att = (q @ k.transpose(-2, -1)) * (
+            1.0 / math.sqrt(k.size(-1))
+        )  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
         att = F.softmax(att, dim=-1)
         y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = (
@@ -159,5 +165,18 @@ class GPT(nn.Module):
 
         return model
 
-
-model = GPT.from_pretrained("gpt2")
+    def forward(self, idx):
+        # idx is of shape (B, T), batch size, sequence length
+        B, T = idx.size()
+        assert (
+            T <= self.config.block_size
+        ), f"Cannot forward sequence of length {T}, block size is {self.config.block_size}"
+        pos = torch.arange(0, T, dtype=torch.long, device=idx.device)  # shape (T)
+        pos_emb = self.transformer.wpe(pos)  # (T, n_embd)
+        token_emb = self.transformer.wte(idx)  # (B, T, n_embd)
+        x = token_emb + pos_emb
+        for block in self.transformer.h:
+            x = block(x)
+        x = self.transformer.ln_f(x)
+        logits = self.lm_head(x)  # (B, T, vocab_size)
+        return logits
