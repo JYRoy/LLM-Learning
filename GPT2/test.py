@@ -1,26 +1,47 @@
 import tiktoken
 from model import *
-from dataloader import *
+
+
+def read_input():
+    with open("../data/tiny_shakespeare/input.txt") as f:
+        text = f.read()
+    data = text[:1000]
+    print(data[:100])
+    enc = tiktoken.get_encoding("gpt2")
+    tokens = enc.encode(data)
+    print(tokens[:24])
+    buf = torch.tensor(tokens[: 24 + 1])
+    x = buf[:-1].view(4, 6)
+    y = buf[1:].view(4, 6)
+    print(x)
+    print(y)
 
 
 def toy_eval():
     num_return_sequences = 5
     max_length = 30
-    # model = GPT.from_pretrained("gpt2")
-    model = GPT(GPTConfig())
+    model = GPT.from_pretrained("gpt2")
+    # model = GPT(GPTConfig())
     model.train()
     model.to("cuda")
 
     # get a data batch
-    train_loader = DataLoaderLite(B=4, T=32)
+    enc = tiktoken.get_encoding("gpt2")
+    with open("../data/tiny_shakespeare/input.txt") as f:
+        text = f.read()
+    data = text[:1000]
+    tokens = enc.encode(data)
+    B, T = 4, 32  # batchsize, seq length
+    buf = torch.tensor(tokens[: B * T + 1])
+    buf = buf.to("cuda")
+    x = buf[:-1].view(B, T)
+    y = buf[1:].view(B, T)
 
     # logits, loss = model(x, y)
     # print(logits.shape)
     # print(loss)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
     for i in range(50):
-        x, y = train_loader.next_batch()
-        x, y = x.to("cuda"), y.to("cuda")
         optimizer.zero_grad()
         logits, loss = model(x, y)
         loss.backward()
@@ -57,4 +78,5 @@ def toy_eval():
 
 
 if __name__ == "__main__":
-    toy_eval()
+    # toy_eval()
+    read_input()
