@@ -5,6 +5,7 @@
   - [Architecture](#architecture)
   - [Zero-shot](#zero-shot)
   - [Dataset](#dataset)
+  - [FlashAttention](#flashattention)
   - [Reference](#reference)
 
 
@@ -41,6 +42,10 @@ GPT2.0 compared with SOTA zero-shot approaches in many NLP tasks like below. Act
 ## Dataset
 
 They made a new dataset of millongs of webpages called WebText. 
+
+## FlashAttention
+
+I used FlashAttention to implement GPT2. The note in [LLM-Learning/FlashAttention/README.md](../FlashAttention/README.md)
 
 ## Reference
 

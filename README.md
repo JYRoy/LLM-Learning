@@ -10,6 +10,7 @@ Learning how to build and fine-tune some large language models from scratch inps
   - [Awesome LLM](#awesome-llm)
     - [Model](#model)
     - [Fine-tuning](#fine-tuning)
+    - [LLM Deployment](#llm-deployment)
   - [Environments](#environments)
 
 
@@ -17,11 +18,14 @@ Learning how to build and fine-tune some large language models from scratch inps
 
 Here are the models and algorithms I implemented and noted.
 
-- [Bigram](./Bigram/README.md)
-- [Transformer](./Transformer/README.md)
-- [BERT](./BERT/README.md)
-- [GPT1.0](./GPT1/README.md)
-- [GPT2.0](./GPT2/README.md)
+- Model
+  - [Bigram](./Bigram/README.md): impl & note
+  - [Transformer](./Transformer/README.md): impl & note
+  - [BERT](./BERT/README.md): impl & note
+  - [GPT1.0](./GPT1/README.md): note
+  - [GPT2.0](./GPT2/README.md): impl & note
+- LLM Deployment
+  - [FlashAttention](./FlashAttention/README.md): note & impl in GPT2
 
 ## Awesome LLM
 
@@ -29,7 +33,7 @@ Here are some milestone works in LLM, but I'll just pick some of them and implem
 
 ### Model
 
-|  Date   |   keywords   | Institute | Paper|
+|  Date   |   keywords   | Institute | Sites|
 | :-----: | :----------: | :-------: | :--: |
 | 2017-06 | Transformers |  Google   | [Attention Is All You Need](https://arxiv.org/pdf/1706.03762.pdf)|
 | 2018-06 |   GPT 1.0    |  OpenAI   | [Improving Language Understanding by Generative Pre-Training](https://www.cs.ubc.ca/~amuham01/LING530/papers/radford2018improving.pdf)|
@@ -46,10 +50,18 @@ Here are some milestone works in LLM, but I'll just pick some of them and implem
 
 ### Fine-tuning
 
-|  Date   |   keywords   | Institute | Paper|
+|  Date   |   keywords   | Institute | Sites|
 | :-----: | :----------: | :-------: | :--: |
 | 2021-05 | LoRA |  Microsoft   | [LORA: LOW-RANK ADAPTATION OF LARGE LAN-GUAGE MODELS](https://arxiv.org/abs/2106.09685)|
 | ... |  ...   |  ...   | ...  |
+
+### LLM Deployment
+
+|  Date   |   keywords   | Institute | Sites |
+| :-----: | :----------: | :-------: | :--: |
+| 2022-6 | Flash-Attention |  Stanford   | [FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness](https://github.com/Dao-AILab/flash-attention)|
+| ... |  ...   |  ...   | ...  |
+
 
 ## Environments
 
