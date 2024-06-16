@@ -1,3 +1,4 @@
+import time
 import tiktoken
 from model import *
 from dataloader import *
@@ -6,26 +7,33 @@ from dataloader import *
 def toy_eval():
     num_return_sequences = 5
     max_length = 30
+    torch.set_float32_matmul_precision("medium")
     # model = GPT.from_pretrained("gpt2")
     model = GPT(GPTConfig())
     model.train()
     model.to("cuda")
+    model = torch.compile(model)
 
     # get a data batch
-    train_loader = DataLoaderLite(B=4, T=32)
+    train_loader = DataLoaderLite(B=4, T=1024)
 
-    # logits, loss = model(x, y)
-    # print(logits.shape)
-    # print(loss)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
     for i in range(50):
+        t0 = time.time()
         x, y = train_loader.next_batch()
         x, y = x.to("cuda"), y.to("cuda")
         optimizer.zero_grad()
-        logits, loss = model(x, y)
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            logits, loss = model(x, y)
         loss.backward()
         optimizer.step()
-        print(f"step: {i}, loss: {loss.item()}")
+        torch.cuda.synchronize()
+        t1 = time.time()
+        dt = (t1 - t0) * 1000
+        tokens_per_sec = (train_loader.B * train_loader.T) / (t1 - t0)
+        print(
+            f"step: {i}, loss: {loss.item()}, dt: {dt:.2f}ms,, tok/sec: {tokens_per_sec:.2f}"
+        )
 
     exit(-1)
 
