@@ -11,7 +11,7 @@ warmup_steps = 10
 num_return_sequences = 5
 max_length = 30
 total_batch_size = 524288  # 2**19，~0.5M batch size in tokens
-B = 16  # micro batch size
+B = 4  # micro batch size
 T = 1024  # sequence length
 assert (
     total_batch_size % (B * T) == 0
@@ -33,7 +33,6 @@ def get_lr(it):
     return min_lr + coeff * (max_lr - min_lr)
 
 
-max_steps
 # model = GPT.from_pretrained("gpt2")
 model = GPT(GPTConfig(vocab_size=50304))
 model.train()
@@ -41,7 +40,7 @@ model.to("cuda")
 model = torch.compile(model)
 
 # get a data batch
-train_loader = DataLoaderLite(B=4, T=1024)
+train_loader = DataLoaderLite(B=B, T=T)
 
 # optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
 optimizer = model.configure_optimizer(
