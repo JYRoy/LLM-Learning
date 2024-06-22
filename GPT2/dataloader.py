@@ -3,16 +3,22 @@ import tiktoken
 
 
 class DataLoaderLite:
-    def __init__(self, B, T, process_rank, num_processes) -> None:
+    def __init__(self, B, T, process_rank, num_processes, split) -> None:
         self.B = B  # micro batch size
         self.T = T  # sequence length
         self.process_rank = process_rank
         self.num_processes = num_processes
+        assert split in {"train", "val"}  # train or val
 
         with open("../data/tiny_shakespeare/input.txt") as f:
             text = f.read()
         enc = tiktoken.get_encoding("gpt2")
         tokens = enc.encode(text)
+        tokens = (
+            tokens[: (len(tokens) * 90 // 100)]
+            if split == "train"
+            else tokens[(len(tokens) * 90 // 100) + 1 :]
+        )
         self.tokens = torch.tensor(tokens)
         print(f"loaded {len(self.tokens)} tokens")
         print(f"1 epoch = {len(self.tokens) // (B * T)} batches")
@@ -20,6 +26,9 @@ class DataLoaderLite:
         self.current_position = (
             self.B * self.T * self.process_rank
         )  # different rank starts from different part of data
+
+    def reset(self):
+        self.current_position = self.B * self.T * self.process_rank
 
     def next_batch(self):
         B, T = self.B, self.T

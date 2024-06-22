@@ -30,6 +30,7 @@ else:
     ddp_world_size = 1
     device = f"cuda:{ddp_local_rank}"
     device = "cpu"
+    master_process = True
     if torch.cuda.is_available():
         device = "cuda"
     print(f"Using device: {device}")
@@ -79,7 +80,10 @@ raw_model = model.module if ddp else model
 
 # get a data batch
 train_loader = DataLoaderLite(
-    B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size
+    B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="train"
+)
+val_loader = DataLoaderLite(
+    B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, split="val"
 )
 
 # optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
@@ -88,6 +92,25 @@ optimizer = raw_model.configure_optimizer(
 )
 for step in range(max_steps):
     t0 = time.time()
+
+    if step % 10 == 0:
+        val_loader.reset()
+        with torch.no_grad():
+            val_loss_accum = 0.0
+            val_loss_steps = 20
+            for _ in range(val_loss_steps):
+                x, y = val_loader.next_batch()
+                x, y = x.to(device), y.to(device)
+                with torch.autocast(device_type=device, dtype=torch.bfloat16):
+                    logits, loss = model(x, y)
+                loss = loss / val_loss_steps
+                val_loss_accum += loss.detach()
+        if ddp:
+            dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
+        if master_process:
+            print(f"validation loss: {val_loss_accum.item():.4f}")
+
+    model.train()
     optimizer.zero_grad()
     loss_accum = 0.0
     for micro_step in range(grad_accum_steps):
