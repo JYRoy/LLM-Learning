@@ -35,7 +35,7 @@ else:
         device = "cuda"
     print(f"Using device: {device}")
 
-
+enc = tiktoken.get_encoding("gpt2")
 max_lr = 3e-4
 min_lr = max_lr * 0.1
 max_steps = 50
@@ -69,8 +69,8 @@ def get_lr(it):
     return min_lr + coeff * (max_lr - min_lr)
 
 
-# model = GPT.from_pretrained("gpt2")
-model = GPT(GPTConfig(vocab_size=50304))
+model = GPT.from_pretrained("gpt2")
+# model = GPT(GPTConfig(vocab_size=50304))
 model.train()
 model.to(device)
 model = torch.compile(model)
@@ -109,6 +109,37 @@ for step in range(max_steps):
             dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
         if master_process:
             print(f"validation loss: {val_loss_accum.item():.4f}")
+
+    if step % 10 == 0 and step > -1:
+        model.eval()
+        tokens = enc.encode("Hello, I'm a language model,")
+        tokens = torch.tensor(tokens, dtype=torch.long)
+        tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1)
+        xgen = tokens.to(device)
+        sample_rng = torch.Generator(device=device)
+        sample_rng.manual_seed(42 + ddp_rank)
+        while xgen.size(1) < max_length:
+            with torch.no_grad():
+                logits, loss = model(xgen)  # (B, T, vocab_size)
+                logits = logits[
+                    :, -1, :
+                ]  # take the logits at the last position (B, vocab_size)
+                probs = F.softmax(logits, dim=-1)
+                topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)  # (5, 50)
+                # select a token from the top-k probabilities
+                ix = torch.multinomial(
+                    topk_probs, 1, generator=sample_rng
+                )  # (B, 1), ix is the index of topk_probs
+                xcol = torch.gather(
+                    topk_indices, -1, ix
+                )  # (B, 1), get the token indice by the topk_probs' index
+                xgen = torch.cat(
+                    (xgen, xcol), dim=1
+                )  # concat the original x with the predicted token indice xcol
+        for i in range(num_return_sequences):
+            tokens = xgen[i, :max_length].tolist()
+            decoded = enc.decode(tokens)
+            print(f"rank {ddp_rank} sample {i}: {decoded}")
 
     model.train()
     optimizer.zero_grad()
@@ -149,27 +180,3 @@ for step in range(max_steps):
 
 if ddp:
     destroy_process_group()
-
-exit(0)
-
-while x.size(1) < max_length:
-    with torch.no_grad():
-        logits = model(x)  # (B, T, vocab_size)
-        logits = logits[
-            :, -1, :
-        ]  # take the logits at the last position (B, vocab_size)
-        probs = F.softmax(logits, dim=-1)
-        topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)  # (5, 50)
-        # select a token from the top-k probabilities
-        ix = torch.multinomial(topk_probs, 1)  # (B, 1), ix is the index of topk_probs
-        xcol = torch.gather(
-            topk_indices, -1, ix
-        )  # (B, 1), get the token indice by the topk_probs' index
-        x = torch.cat(
-            (x, xcol), dim=1
-        )  # concat the original x with the predicted token indice xcol
-
-for i in range(num_return_sequences):
-    tokens = x[i, :max_length].tolist()
-    decoded = enc.decode(tokens)
-    print(">", decoded)
