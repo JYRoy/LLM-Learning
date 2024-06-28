@@ -4,6 +4,7 @@
   - [Overview](#overview)
   - [Architecture](#architecture)
     - [Attention Module](#attention-module)
+    - [Mathematical trick in self-attention](#mathematical-trick-in-self-attention)
   - [Zero-shot](#zero-shot)
   - [Dataset](#dataset)
   - [FlashAttention](#flashattention)
@@ -43,60 +44,133 @@ $$
 Attention(Q_{n\times{d_k}}, K_{n\times{d_k}}, V_{n\times{d_v}}) = mask(softmax(\frac{Q_{n\times{d_k}}K_{d_k\times{n}}^T}{\sqrt{d_k}})) V_{n\times{d_v}} = mask(Attention_{n\times{n}})V_{n\times{d_v}} = O_{n\times{d_v}}
 $$
 
+### Mathematical trick in self-attention
+
+Lets' focusing on the mathematical trick in self-attention. It is the key point of all Transformer based model. The code of this part is on [test_self_attention.py](./test_self_attention.py)
+
+Create a batch. We would like to couple each other on the second dimension(sequence length) in a specific way, like that the fifth location, it should not communicate with tokens in the sixth, seventh, and eight location, cause those are future tokens in the sequence. So that, information only flows from previous context to the current time step.
+
 ```python
-class CausalSelfAttention(nn.Module):
-
-    def __init__(self, config):
-        super().__init__()
-        assert config.n_embd % config.n_head == 0
-        # get qkv in one maxtic calculation that concat weight Q, K, V into one weight as linear
-        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
-        # output projection
-        self.c_proj = nn.Linear(config.n_embd, config.n_embd)
-        self.c_proj.NANOGPT_SCALE_INIT = 1
-        self.n_head = config.n_head
-        self.n_embd = config.n_embd
-
-        # not really a bias, actually a mask, just following the OpenAI naming though
-        self.register_buffer(
-            "bias",
-            torch.tril(torch.ones(config.block_size, config.block_size)).view(
-                1, 1, config.block_size, config.block_size
-            ),
-        )
-
-    def forward(self, x):
-        B, T, C = x.size()  # batch size, sequence length, embedding dimension (n_embd)
-        # nh is "number of heads", hs is "head size", C is "number of channels" = nh * hs
-        qkv = self.c_attn(x)
-        q, k, v = qkv.split(self.n_embd, dim=2)  # batch size, seq len, n_embd
-
-        # split n_embd into serveral heads so that dim2 means n_heads and dim3 means C(n_embd) // n_heads
-        # it means that each head for q/k/v has C // n_heads(hs) embedding dimensions
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(
-            1, 2
-        )  # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(
-            1, 2
-        )  # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(
-            1, 2
-        )  # (B, nh, T, hs)
-        # attention (materializes the large (T, T) matrix for all the queries and keys)
-        att = (q @ k.transpose(-2, -1)) * (
-            1.0 / math.sqrt(k.size(-1))
-        )  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))
-        att = F.softmax(att, dim=-1)
-        y = att @ v  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-
-        y = (
-            y.transpose(1, 2).contiguous().view(B, T, C)
-        )  # re-assemble all head outputs side by side
-        # output projection
-        y = self.c_proj(y)
-        return y
+torch.manual_seed(2024)
+B, T, C = 4, 8, 2  # Batch size, sequence length (or time), embedding size (or channels)
+x = torch.randn(B, T, C)  # torch.Size([4, 8, 2])
 ```
+
+Before looking up self-attention, let's considering a easier way to make a communication for each other. We want $x[b, t] = mean_{i<=t} x[b, i]$ that using the mean value before current token. The `xbow[b, t]` is the vertical average of all tokens on the column.
+
+```python
+xbow = torch.zeros((B, T, C))
+for b in range(B):
+    for t in range(T):
+        xprev = x[b,:t+1]  # (t, C)
+        xbow[b, t] = torch.mean(xprev, 0)
+"""
+xbow[0]
+tensor([[-1.2262, -0.0093],
+        [ 0.1579, -0.2375],
+        [ 0.1984, -0.2453],
+        [ 0.3045, -0.4730],
+        [ 0.2671, -0.7557],
+        [ 0.5862, -0.6619],
+        [ 0.5790, -0.6945],
+        [ 0.4679, -0.5109]])
+"""
+```
+
+Right now everything is going well, but it is very inefficient. The trick is very efficient about doing this using matrix multiplication. Considering that the row of a will dot product the column of b and get the fisrt point of c.
+
+```python
+torch.manual_seed(42)
+a = torch.ones(3, 3)
+b = torch.randint(0, 10, (3, 2)).float()
+c = a @ b
+```
+
+Then let's introduce tril. Some values are ignored at zero position. The reason for it is a sum calcultion is that value of a is one.
+
+```python
+torch.manual_seed(42)
+a = torch.tril(torch.ones(3, 3))
+b = torch.randint(0, 10, (3, 2)).float()
+c = a @ b
+
+"""
+a=
+tensor([[1., 0., 0.],
+        [1., 1., 0.],
+        [1., 1., 1.]])
+----
+b=
+tensor([[2., 7.],
+        [6., 4.],
+        [6., 5.]])
+----
+c=
+tensor([[ 2.,  7.],
+        [ 8., 11.],
+        [14., 16.]])
+"""
+```
+
+If we normalize a, we could get average value in c.
+
+```python
+torch.manual_seed(42)
+a = torch.tril(torch.ones(3, 3))
+a = a / torch.sum(a, 1, keepdim=True)
+b = torch.randint(0, 10, (3, 2)).float()
+c = a @ b
+"""
+a=
+tensor([[1.0000, 0.0000, 0.0000],
+        [0.5000, 0.5000, 0.0000],
+        [0.3333, 0.3333, 0.3333]])
+----
+b=
+tensor([[2., 7.],
+        [6., 4.],
+        [6., 5.]])
+----
+c=
+tensor([[2.0000, 7.0000],
+        [4.0000, 5.5000],
+        [4.6667, 5.3333]])
+"""
+```
+
+So, with these basis, let's back to the xbow and make it much more efficient using what we've learned. It could get the same value with the version 1. Thinking that @, we matmal triangle matrix (T, T) with (T, C), so we actually calculate the average sum on the column of (T, C).
+
+```python
+wei = torch.tril(torch.ones(T, T))
+wei = wei / wei.sum(1, keepdim=True)
+xbow2 = wei @ x  # (T, T) @ (B, T, C) -> (B, T, C)
+torch.allclose(xbow, xbow2)
+```
+
+Now, lets using softmax instead of dividing $wei.sum$ as version 3.
+
+```python
+import torch.nn.functional as F
+tril = torch.tril(torch.ones(T, T))
+wei = torch.zeros((T, T))
+wei = wei.masked_fill(tril == 0, float('-inf')) 
+wei = F.softmax(wei, dim=-1)
+xbow3 = wei @ x
+torch.allclose(xbow, xbow3)
+"""
+wei
+tensor([[1.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+        [0.5000, 0.5000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+        [0.3333, 0.3333, 0.3333, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+        [0.2500, 0.2500, 0.2500, 0.2500, 0.0000, 0.0000, 0.0000, 0.0000],
+        [0.2000, 0.2000, 0.2000, 0.2000, 0.2000, 0.0000, 0.0000, 0.0000],
+        [0.1667, 0.1667, 0.1667, 0.1667, 0.1667, 0.1667, 0.0000, 0.0000],
+        [0.1429, 0.1429, 0.1429, 0.1429, 0.1429, 0.1429, 0.1429, 0.0000],
+        [0.1250, 0.1250, 0.1250, 0.1250, 0.1250, 0.1250, 0.1250, 0.1250]])
+"""
+```
+
+todo: version4 self-attention!
 
 ## Zero-shot
 
